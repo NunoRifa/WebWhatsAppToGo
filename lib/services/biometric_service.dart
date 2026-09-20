@@ -22,6 +22,19 @@ class BiometricService {
     }
   }
 
+  /// Check whether the device actually has biometrics or credentials enrolled and ready
+  static Future<bool> canAuthenticate() async {
+    try {
+      final canCheck = await _auth.canCheckBiometrics;
+      final isSupported = await _auth.isDeviceSupported();
+      final biometrics = await _auth.getAvailableBiometrics();
+      return (canCheck && biometrics.isNotEmpty) || isSupported;
+    } catch (e) {
+      debugPrint('Error checking canAuthenticate: $e');
+      return false;
+    }
+  }
+
   /// Get list of available biometric hardware types (e.g. fingerprint, face, weak, strong)
   static Future<List<BiometricType>> getAvailableBiometrics() async {
     try {
@@ -37,6 +50,14 @@ class BiometricService {
     String reason = 'Gunakan biometrik atau PIN untuk membuka WhatsGo',
   }) async {
     try {
+      final isAvailable = await isBiometricAvailable();
+      if (!isAvailable) {
+        debugPrint('Biometric/Device Credential is not supported on this device.');
+        // Auto-disable if not supported to prevent soft-lock
+        await setBiometricEnabled(false);
+        return true;
+      }
+
       return await _auth.authenticate(
         localizedReason: reason,
         options: const AuthenticationOptions(
@@ -48,6 +69,15 @@ class BiometricService {
       );
     } catch (e) {
       debugPrint('Biometric authentication error: $e');
+      final errStr = e.toString().toLowerCase();
+      // If no credentials or biometrics are enrolled on emulator/device, auto-disable
+      if (errStr.contains('notenrolled') ||
+          errStr.contains('not available') ||
+          errStr.contains('passcodenotset') ||
+          errStr.contains('not supported')) {
+        await setBiometricEnabled(false);
+        return true; // Bypass lock so user is not permanently stuck
+      }
       return false;
     }
   }
@@ -90,6 +120,13 @@ class BiometricService {
   static Future<bool> shouldLockOnResume() async {
     final isEnabled = await isBiometricEnabled();
     if (!isEnabled) return false;
+
+    // Check whether the device actually supports authentication
+    final canAuth = await canAuthenticate();
+    if (!canAuth) {
+      await setBiometricEnabled(false);
+      return false;
+    }
 
     if (_lastPausedTime == null) return false;
 

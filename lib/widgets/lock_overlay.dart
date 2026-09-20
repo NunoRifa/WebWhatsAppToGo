@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
 import '../services/biometric_service.dart';
@@ -28,6 +29,15 @@ class _LockOverlayState extends State<LockOverlay> {
 
   Future<void> _triggerAuthentication() async {
     if (_isAuthenticating) return;
+
+    final canAuth = await BiometricService.canAuthenticate();
+    if (!canAuth) {
+      // Device does not have credentials or biometrics set up, bypass and auto-disable
+      await BiometricService.setBiometricEnabled(false);
+      BiometricService.clearPausedTime();
+      widget.onUnlock();
+      return;
+    }
 
     setState(() {
       _isAuthenticating = true;
@@ -194,6 +204,27 @@ class _LockOverlayState extends State<LockOverlay> {
                           ),
                         ],
                       ),
+                    ),
+                  ],
+
+                  // Debug Mode Bypass & Emergency Reset Button
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 24),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orange,
+                        side: const BorderSide(color: Colors.orange),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      icon: const Icon(Icons.developer_mode, size: 18),
+                      label: const Text('Bypass & Matikan Kunci (Mode Debug)'),
+                      onPressed: () async {
+                        await BiometricService.setBiometricEnabled(false);
+                        BiometricService.clearPausedTime();
+                        widget.onUnlock();
+                      },
                     ),
                   ],
                 ],

@@ -84,7 +84,14 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
     final serviceEnabled = await AppForegroundService.isServiceEnabledPreference();
     final hidePreview = await AppForegroundService.isHidePreviewPreference();
     final bioEnabled = await BiometricService.isBiometricEnabled();
+    final canAuth = await BiometricService.canAuthenticate();
     final timeout = await BiometricService.getLockTimeoutMinutes();
+
+    final effectiveBio = bioEnabled && canAuth;
+    if (bioEnabled && !canAuth) {
+      // If hardware/PIN credentials are not enrolled on device/emulator, auto-disable
+      await BiometricService.setBiometricEnabled(false);
+    }
 
     // Request notification & media permissions for Android
     await Permission.notification.request();
@@ -95,9 +102,9 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
         _isDesktopMode = desktop;
         _isForegroundServiceEnabled = serviceEnabled;
         _hideNotificationPreview = hidePreview;
-        _isBiometricEnabled = bioEnabled;
+        _isBiometricEnabled = effectiveBio;
         _lockTimeoutMinutes = timeout;
-        if (bioEnabled) {
+        if (effectiveBio) {
           _isAppLocked = true;
         }
       });
@@ -343,6 +350,23 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                     subtitle: const Text('Kunci WhatsGo saat aplikasi ditutup atau di latar belakang'),
                     value: _isBiometricEnabled,
                     onChanged: (val) async {
+                      if (val) {
+                        final canAuth = await BiometricService.canAuthenticate();
+                        if (!canAuth) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Perangkat belum mengatur PIN/Pola/Sidik Jari. Atur kunci layar di Pengaturan Android terlebih dahulu.',
+                                ),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                      }
+
                       final authSuccess = await BiometricService.authenticate(
                         reason: val
                             ? 'Konfirmasi biometrik atau PIN untuk mengaktifkan kunci'
@@ -356,6 +380,16 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                         setState(() {
                           _isBiometricEnabled = val;
                         });
+                      } else {
+                        if (!val) {
+                          // Allow fail-safe disable if authentication is unavailable
+                          final canAuth = await BiometricService.canAuthenticate();
+                          if (!canAuth) {
+                            await BiometricService.setBiometricEnabled(false);
+                            setModalState(() => _isBiometricEnabled = false);
+                            setState(() => _isBiometricEnabled = false);
+                          }
+                        }
                       }
                     },
                   ),
