@@ -1,11 +1,14 @@
 import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../constants/app_constants.dart';
+import '../constants/responsive_scripts.dart';
 import '../services/user_agent_service.dart';
+import '../widgets/direct_chat_dialog.dart';
 import '../widgets/error_view.dart';
 import '../widgets/slim_app_bar.dart';
 
@@ -17,6 +20,8 @@ class WebViewScreen extends StatefulWidget {
 }
 
 class _WebViewScreenState extends State<WebViewScreen> {
+  static const MethodChannel _appChannel = MethodChannel('whatsgo.nunorifa.my.id/app');
+
   InAppWebViewController? _webViewController;
   String _currentUserAgent = AppConstants.defaultDesktopUserAgent;
   bool _isDesktopMode = false;
@@ -25,6 +30,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool _hasError = false;
   String _errorMessage = '';
   bool _showSlimBar = true;
+  bool _isInChat = false;
 
   @override
   void initState() {
@@ -86,12 +92,23 @@ class _WebViewScreenState extends State<WebViewScreen> {
         await Permission.microphone.request();
       }
     }
-    // Grant resources after requesting Android permissions
     return controller.android.grantPermissions(
       request: request,
       resources: resources,
       action: PermissionResponseAction.GRANT,
     );
+  }
+
+  /// Inject or remove responsive CSS/JS based on current desktop toggle
+  Future<void> _applyResponsiveMode() async {
+    if (_webViewController == null) return;
+
+    if (!_isDesktopMode) {
+      await _webViewController!.injectCSSCode(source: ResponsiveScripts.mobileCss);
+      await _webViewController!.evaluateJavascript(source: ResponsiveScripts.mobileJs);
+    } else {
+      await _webViewController!.evaluateJavascript(source: ResponsiveScripts.disableMobileScript);
+    }
   }
 
   void _reloadPage() {
@@ -100,6 +117,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
       _errorMessage = '';
       _isLoading = true;
       _progress = 0.0;
+      _isInChat = false;
     });
     _webViewController?.reload();
   }
@@ -109,8 +127,29 @@ class _WebViewScreenState extends State<WebViewScreen> {
     await UserAgentService.setDesktopModeEnabled(newMode);
     setState(() {
       _isDesktopMode = newMode;
+      _isInChat = false;
     });
-    _reloadPage();
+    _applyResponsiveMode();
+  }
+
+  /// Move app to background without destroying process or WebSocket connection
+  Future<void> _moveTaskToBack() async {
+    try {
+      await _appChannel.invokeMethod('moveTaskToBack');
+    } catch (e) {
+      SystemNavigator.pop();
+    }
+  }
+
+  void _openDirectChat() {
+    DirectChatDialog.show(
+      context,
+      onStartChat: (targetUrl) {
+        _webViewController?.loadUrl(
+          urlRequest: URLRequest(url: WebUri(targetUrl)),
+        );
+      },
+    );
   }
 
   void _showSettingsModal() {
@@ -125,8 +164,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   Widget _buildSettingsSheet(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -150,6 +187,17 @@ class _WebViewScreenState extends State<WebViewScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
+
+            // Direct Chat shortcut
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline, color: AppConstants.primaryTeal),
+              title: const Text('Direct Chat'),
+              subtitle: const Text('Kirim pesan tanpa simpan nomor kontak'),
+              onTap: () {
+                Navigator.pop(context);
+                _openDirectChat();
+              },
+            ),
 
             // Toggle Desktop View
             SwitchListTile(
@@ -199,7 +247,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             ListTile(
               leading: const Icon(Icons.info_outline),
               title: const Text('Tentang WhatsGo'),
-              subtitle: const Text('WA Web To Go Reborn - v1.0.0'),
+              subtitle: const Text('WA Web To Go Reborn - v1.0.0 (Milestone 2)'),
               onTap: () {
                 Navigator.pop(context);
                 showAboutDialog(
@@ -314,16 +362,22 @@ class _WebViewScreenState extends State<WebViewScreen> {
       onPopInvoked: (didPop) async {
         if (didPop) return;
 
-        // Try navigating back within WebView history first
+        // 1. If currently inside an active chat in 1-column mode, close the chat and return to list
+        if (!_isDesktopMode && _isInChat) {
+          await _webViewController?.evaluateJavascript(
+            source: 'window.whatsGoCloseChat && window.whatsGoCloseChat();',
+          );
+          return;
+        }
+
+        // 2. If browser has web history, navigate back
         if (_webViewController != null && await _webViewController!.canGoBack()) {
           await _webViewController!.goBack();
           return;
         }
 
-        // If at root of history, prompt or allow normal backgrounding
-        if (context.mounted) {
-          Navigator.of(context).maybePop();
-        }
+        // 3. At root of chat list: send app to background (keep WebSocket alive)
+        await _moveTaskToBack();
       },
       child: Scaffold(
         body: Column(
@@ -356,6 +410,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     initialUserScripts: _buildInitialUserScripts(),
                     onWebViewCreated: (controller) {
                       _webViewController = controller;
+
+                      // Register JavaScript Handler for chat state updates
+                      controller.addJavaScriptHandler(
+                        handlerName: 'onChatStateChanged',
+                        callback: (args) {
+                          if (args.isNotEmpty && args[0] is bool) {
+                            setState(() {
+                              _isInChat = args[0] as bool;
+                            });
+                          }
+                        },
+                      );
                     },
                     onPermissionRequest: (controller, request) async {
                       await _handlePermissionRequest(controller, request);
@@ -381,9 +447,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         _isLoading = false;
                         _progress = 1.0;
                       });
+                      // Apply responsive single-column layout
+                      await _applyResponsiveMode();
                     },
                     onReceivedError: (controller, request, error) {
-                      // Only show full error view if the main frame failed to load
                       if (request.isForMainFrame ?? false) {
                         setState(() {
                           _isLoading = false;
@@ -393,7 +460,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       }
                     },
                     onScrollChanged: (controller, x, y) {
-                      // Auto-hide slim bar on downward scroll, reveal on upward scroll
                       if (y > 50 && _showSlimBar) {
                         setState(() {
                           _showSlimBar = false;
@@ -452,8 +518,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
             ),
           ],
         ),
+
+        // WhatsApp-styled Floating Action Button for Direct Chat
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: AppConstants.accentGreen,
+          foregroundColor: Colors.white,
+          elevation: 4,
+          shape: const CircleBorder(),
+          tooltip: 'Direct Chat (Kirim Pesan Tanpa Simpan Kontak)',
+          onPressed: _openDirectChat,
+          child: const Icon(Icons.chat, size: 24),
+        ),
       ),
     );
   }
 }
-
