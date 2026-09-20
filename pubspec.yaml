@@ -1,0 +1,40 @@
+name: whatsgo
+description: "WhatsGo (WA Web To Go Reborn) - A Modern, Responsive, and Resilient WhatsApp Web Client for Android"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Browser & WebView
+  flutter_inappwebview: ^6.1.5
+
+  # Storage & Preferences
+  shared_preferences: ^2.3.2
+  flutter_secure_storage: ^9.2.2
+
+  # Hardware & Permissions
+  permission_handler: ^11.3.1
+  local_auth: ^2.3.0
+
+  # Background Services
+  flutter_foreground_task: ^8.18.0
+
+  # Utilities & Icons
+  url_launcher: ^6.3.0
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/
+
