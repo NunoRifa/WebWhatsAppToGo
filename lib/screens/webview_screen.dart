@@ -6,7 +6,10 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../constants/app_constants.dart';
+import '../constants/notification_scripts.dart';
 import '../constants/responsive_scripts.dart';
+import '../services/direct_chat_service.dart';
+import '../services/foreground_service.dart';
 import '../services/user_agent_service.dart';
 import '../widgets/direct_chat_dialog.dart';
 import '../widgets/error_view.dart';
@@ -32,6 +35,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool _showSlimBar = true;
   bool _isInChat = false;
 
+  // Foreground Service & Notification settings
+  bool _isForegroundServiceEnabled = true;
+  bool _hideNotificationPreview = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,11 +48,24 @@ class _WebViewScreenState extends State<WebViewScreen> {
   Future<void> _loadInitialConfiguration() async {
     final ua = await UserAgentService.getUserAgent();
     final desktop = await UserAgentService.isDesktopModeEnabled();
+    final serviceEnabled = await AppForegroundService.isServiceEnabledPreference();
+    final hidePreview = await AppForegroundService.isHidePreviewPreference();
+
+    // Request notification permissions for Android 13+
+    await Permission.notification.request();
+
     if (mounted) {
       setState(() {
         _currentUserAgent = ua;
         _isDesktopMode = desktop;
+        _isForegroundServiceEnabled = serviceEnabled;
+        _hideNotificationPreview = hidePreview;
       });
+    }
+
+    // Start background foreground service if enabled
+    if (serviceEnabled) {
+      await AppForegroundService.startService();
     }
   }
 
@@ -75,6 +95,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
     return UnmodifiableListView([
       UserScript(
         source: AppConstants.platformSpoofScript,
+        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+      ),
+      UserScript(
+        source: NotificationScripts.notificationInterceptionScript,
         injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
       ),
     ]);
@@ -164,103 +188,150 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   Widget _buildSettingsSheet(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade400,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Pengaturan WhatsGo',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Direct Chat shortcut
+                  ListTile(
+                    leading: const Icon(Icons.chat_bubble_outline, color: AppConstants.primaryTeal),
+                    title: const Text('Direct Chat'),
+                    subtitle: const Text('Kirim pesan tanpa simpan nomor kontak'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openDirectChat();
+                    },
+                  ),
+
+                  // Toggle Desktop View
+                  SwitchListTile(
+                    title: const Text('Mode Desktop Penuh'),
+                    subtitle: const Text('Tampilkan 2-kolom bawaan WhatsApp Web'),
+                    value: _isDesktopMode,
+                    onChanged: (val) {
+                      Navigator.pop(context);
+                      _toggleDesktopMode();
+                    },
+                  ),
+
+                  const Divider(),
+
+                  // Foreground Service Toggle
+                  SwitchListTile(
+                    title: const Text('Layanan Latar Belakang (Siaga)'),
+                    subtitle: const Text('Menjaga koneksi tetap aktif agar notifikasi masuk lancar'),
+                    value: _isForegroundServiceEnabled,
+                    onChanged: (val) async {
+                      setModalState(() {
+                        _isForegroundServiceEnabled = val;
+                      });
+                      setState(() {
+                        _isForegroundServiceEnabled = val;
+                      });
+                      await AppForegroundService.setServiceEnabledPreference(val);
+                      if (val) {
+                        await AppForegroundService.startService();
+                      } else {
+                        await AppForegroundService.stopService();
+                      }
+                    },
+                  ),
+
+                  // Privacy Notification Masking
+                  SwitchListTile(
+                    title: const Text('Sembunyikan Isi Pesan di Notifikasi'),
+                    subtitle: const Text('Hanya tampilkan nama pengirim tanpa teks pesan'),
+                    value: _hideNotificationPreview,
+                    onChanged: (val) async {
+                      setModalState(() {
+                        _hideNotificationPreview = val;
+                      });
+                      setState(() {
+                        _hideNotificationPreview = val;
+                      });
+                      await AppForegroundService.setHidePreviewPreference(val);
+                    },
+                  ),
+
+                  const Divider(),
+
+                  // User-Agent Editor
+                  ListTile(
+                    leading: const Icon(Icons.badge_outlined),
+                    title: const Text('Konfigurasi User-Agent'),
+                    subtitle: Text(
+                      _currentUserAgent,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showUserAgentDialog();
+                    },
+                  ),
+
+                  // Clear Cache / Logout
+                  ListTile(
+                    leading: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent),
+                    title: const Text(
+                      'Bersihkan Cache & Cookie',
+                      style: TextStyle(color: Colors.redAccent),
+                    ),
+                    subtitle: const Text('Akan mengeluarkan Anda dari sesi login saat ini'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _confirmClearSession();
+                    },
+                  ),
+
+                  const Divider(),
+
+                  // About
+                  ListTile(
+                    leading: const Icon(Icons.info_outline),
+                    title: const Text('Tentang WhatsGo'),
+                    subtitle: const Text('WA Web To Go Reborn - v1.0.0 (Milestone 3)'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      showAboutDialog(
+                        context: context,
+                        applicationName: 'WhatsGo',
+                        applicationVersion: '1.0.0',
+                        applicationLegalese: 'WhatsApp Web Client for Android',
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Pengaturan WhatsGo',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-
-            // Direct Chat shortcut
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline, color: AppConstants.primaryTeal),
-              title: const Text('Direct Chat'),
-              subtitle: const Text('Kirim pesan tanpa simpan nomor kontak'),
-              onTap: () {
-                Navigator.pop(context);
-                _openDirectChat();
-              },
-            ),
-
-            // Toggle Desktop View
-            SwitchListTile(
-              title: const Text('Mode Desktop Penuh'),
-              subtitle: const Text('Tampilkan 2-kolom bawaan WhatsApp Web'),
-              value: _isDesktopMode,
-              onChanged: (val) {
-                Navigator.pop(context);
-                _toggleDesktopMode();
-              },
-            ),
-
-            // User-Agent Editor
-            ListTile(
-              leading: const Icon(Icons.badge_outlined),
-              title: const Text('Konfigurasi User-Agent'),
-              subtitle: Text(
-                _currentUserAgent,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12),
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                Navigator.pop(context);
-                _showUserAgentDialog();
-              },
-            ),
-
-            // Clear Cache / Logout
-            ListTile(
-              leading: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent),
-              title: const Text(
-                'Bersihkan Cache & Cookie',
-                style: TextStyle(color: Colors.redAccent),
-              ),
-              subtitle: const Text('Akan mengeluarkan Anda dari sesi login saat ini'),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmClearSession();
-              },
-            ),
-
-            const Divider(),
-
-            // About
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('Tentang WhatsGo'),
-              subtitle: const Text('WA Web To Go Reborn - v1.0.0 (Milestone 2)'),
-              onTap: () {
-                Navigator.pop(context);
-                showAboutDialog(
-                  context: context,
-                  applicationName: 'WhatsGo',
-                  applicationVersion: '1.0.0',
-                  applicationLegalese: 'WhatsApp Web Client for Android',
-                );
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -422,6 +493,29 @@ class _WebViewScreenState extends State<WebViewScreen> {
                           }
                         },
                       );
+
+                      // Register JavaScript Handler for incoming web notifications
+                      controller.addJavaScriptHandler(
+                        handlerName: 'onIncomingWebNotification',
+                        callback: (args) async {
+                          if (args.isNotEmpty && args[0] is Map) {
+                            final data = Map<String, dynamic>.from(args[0] as Map);
+                            final title = (data['title'] ?? 'WhatsApp').toString();
+                            final body = (data['body'] ?? '').toString();
+
+                            // Dispatch native Android notification with privacy check
+                            try {
+                              await _appChannel.invokeMethod('showIncomingNotification', {
+                                'title': title,
+                                'body': body,
+                                'hidePreview': _hideNotificationPreview,
+                              });
+                            } catch (e) {
+                              debugPrint('WhatsGo: Error displaying native notification: $e');
+                            }
+                          }
+                        },
+                      );
                     },
                     onPermissionRequest: (controller, request) async {
                       await _handlePermissionRequest(controller, request);
@@ -449,6 +543,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       });
                       // Apply responsive single-column layout
                       await _applyResponsiveMode();
+                      // Ensure notification interception is active
+                      await controller.evaluateJavascript(
+                        source: NotificationScripts.notificationInterceptionScript,
+                      );
                     },
                     onReceivedError: (controller, request, error) {
                       if (request.isForMainFrame ?? false) {

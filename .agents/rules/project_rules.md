@@ -57,3 +57,4 @@ Setiap kali menyelesaikan sebuah **Milestone**, penambahan **fitur baru**, **per
    - `docs:` untuk pembaruan dokumentasi (README, docs, PRD).
    - `refactor:` untuk restrukturisasi kode tanpa mengubah fungsionalitas.
 2. Jangan meninggalkan file temporary atau artifact build yang tidak perlu di git staging.
+

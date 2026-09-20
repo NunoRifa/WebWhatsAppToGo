@@ -13,19 +13,25 @@ Dokumen ini menjelaskan rancangan arsitektur teknis dari aplikasi **WhatsGo** (*
 │  SlimAppBar (Auto-hide Toolbar)                        │
 │  ├── Reload Button                                     │
 │  ├── Toggle Desktop / Mobile Mode                      │
-│  └── Settings Sheet (User-Agent Manager & Logout)      │
+│  └── Settings Sheet (User-Agent, Foreground, Privacy)  │
 ├────────────────────────────────────────────────────────┤
 │  Lapis InAppWebView (Android System WebView Engine)    │
 │  ├── WebSettings: Desktop UA, DOM Storage, WebRTC      │
-│  ├── Pre-document Script: Win32 & Google Inc. Spoofing │
+│  ├── Pre-document Script:                              │
+│  │    ├── Win32 & Google Inc. Platform Spoofing        │
+│  │    └── window.Notification Interception Bridge      │
 │  └── onLoadStop Injection:                             │
 │       ├── Responsive CSS (1-Column Layout)             │
 │       └── MutationObserver JS (#side vs #main)         │
 ├────────────────────────────────────────────────────────┤
-│  Native Android Bridge (Kotlin MethodChannel)          │
-│  └── moveTaskToBack(true) saat Back di Root List       │
+│  Native Android Layer (Kotlin MainActivity)            │
+│  ├── MethodChannel: moveTaskToBack(true)               │
+│  └── Notification Channels:                            │
+│       ├── whatsgo_foreground_service (Status Bar Low)  │
+│       └── whatsgo_messages_channel (Heads-Up High)     │
 ├────────────────────────────────────────────────────────┤
-│  Komponen Utilitas                                     │
+│  Komponen Utilitas & Latar Belakang                    │
+│  ├── AppForegroundService (flutter_foreground_task)    │
 │  └── DirectChatDialog + DirectChatService (+62 format) │
 └───────────────────────────┬────────────────────────────┘
                             │ (Direct HTTPS / WSS)
@@ -131,7 +137,35 @@ Algoritma penanganan tombol Back (`PopScope`) bekerja secara berlapis:
 
 ---
 
-## 5. Strategi Anti-Obsolescence (Tahan Masa Depan)
+## 5. Layanan Siaga Latar Belakang (Android Foreground Service)
+
+Pada Android 10+, sistem operasi secara agresif menghentikan soket jaringan atau menidurkan proses (*Doze Mode*) aplikasi yang diminimalkan.
+
+WhatsGo menerapkan **`AppForegroundService`** via `flutter_foreground_task`:
+1. **Persistent Notification:** Menampilkan notifikasi persisten bertuliskan *"WhatsGo Siaga: Menjaga koneksi pesan tetap aktif"* dengan prioritas `LOW` pada channel `whatsgo_foreground_service`.
+2. **Action Buttons:** Dilengkapi tombol "Buka" (membawa aplikasi ke depan) dan "Hentikan" (mematikan foreground service dari panel notifikasi).
+3. **Keep-Alive:** Memastikan koneksi WebSocket (`wss://web.whatsapp.com/ws/chat`) tetap menerima heartbeat sehingga pesan masuk tidak tertunda.
+
+---
+
+## 6. Bridge Notifikasi Pesan Masuk (Web Notification Bridge)
+
+WhatsApp Web memicu pesan masuk menggunakan API browser standar `new Notification(title, options)`.
+
+1. **Injeksi Intersepsi (`NotificationScripts.notificationInterceptionScript`):**
+   - Menggantikan objek `window.Notification` dengan implementasi kustom WhatsGo.
+   - Otomatis memberikan status `Notification.permission = 'granted'`.
+2. **Penerusan ke Flutter:**
+   - Ketika ada pesan baru, konstruktor `CustomNotification` memanggil:
+     `window.flutter_inappwebview.callHandler('onIncomingWebNotification', { title, body, icon, tag })`.
+3. **Notifikasi Native Android (`showIncomingNotification`):**
+   - Flutter meneruskan data ke native Android via `MethodChannel`.
+   - Native Kotlin membangun `NotificationCompat.Builder` dengan prioritas tinggi (`IMPORTANCE_HIGH`), suara, dan getaran pada channel `whatsgo_messages_channel`.
+   - Jika pengguna mengaktifkan fitur **"Sembunyikan Isi Pesan"**, teks notifikasi otomatis digantikan dengan *"Pesan baru diterima"*.
+
+---
+
+## 7. Strategi Anti-Obsolescence (Tahan Masa Depan)
 
 Aplikasi klien WhatsApp Web lama umumnya gagal karena string User-Agent di-hardcode ke versi browser lama. Ketika WhatsApp menaikkan syarat minimum browser, seluruh aplikasi menjadi rusak.
 
@@ -141,9 +175,8 @@ WhatsGo mengatasi masalah ini dengan dua lapis perlindungan:
 
 ---
 
-## 6. Jaminan Keamanan & Privasi Data
+## 8. Jaminan Keamanan & Privasi Data
 
 - **Zero Middleware Server:** Tidak ada peladen (server) perantara atau API proxy yang digunakan. Seluruh lalu lintas data bergerak langsung antara WebView perangkat dengan server resmi `*.whatsapp.com`.
 - **Enkripsi End-to-End Bawaan:** Enkripsi end-to-end asli WhatsApp Web tetap berjalan secara utuh melalui mesin Web Cryptography API di dalam WebView.
 - **Penyimpanan Lokal:** Cookie sesi dan kredensial IndexedDB disimpan di direktori aplikasi privat Android (`/data/data/whatsgo.nunorifa.my.id/app_webview`).
-

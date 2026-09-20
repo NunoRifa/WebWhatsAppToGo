@@ -52,7 +52,22 @@ Direct Chat memungkinkan Anda mengirim pesan ke nomor WhatsApp baru tanpa perlu 
 
 ---
 
-## 4. Konfigurasi User-Agent (Jika WhatsApp Minta Update Browser)
+## 4. Layanan Latar Belakang & Pengaturan Notifikasi
+
+WhatsGo dilengkapi layanan latar belakang (*Foreground Service*) agar pesan baru tetap masuk secara tepat waktu:
+
+1. **Notifikasi Status Bar ("WhatsGo Siaga"):**
+   - Notifikasi persisten yang memastikan Android tidak mematikan koneksi WhatsApp Web saat aplikasi diminimalkan.
+   - Anda dapat mengetuk tombol **"Buka"** untuk langsung ke aplikasi, atau **"Hentikan"** untuk mematikan layanan.
+2. **Mengatur Layanan Siaga:**
+   - Buka menu **Pengaturan WhatsGo**.
+   - Aktifkan atau nonaktifkan sakelar **"Layanan Latar Belakang (Siaga)"** sesuai kebutuhan daya baterai Anda.
+3. **Privasi Notifikasi Layar Kunci:**
+   - Aktifkan sakelar **"Sembunyikan Isi Pesan di Notifikasi"** pada Pengaturan WhatsGo jika Anda hanya ingin menampilkan nama pengirim tanpa cuplikan isi teks pesan.
+
+---
+
+## 5. Konfigurasi User-Agent (Jika WhatsApp Minta Update Browser)
 
 Jika suatu saat WhatsApp menampilkan pesan seperti *"WhatsApp requires Google Chrome 60+"* atau memblokir akses browser:
 
@@ -64,7 +79,7 @@ Jika suatu saat WhatsApp menampilkan pesan seperti *"WhatsApp requires Google Ch
 
 ---
 
-## 5. Keluar / Ganti Akun (Logout)
+## 6. Keluar / Ganti Akun (Logout)
 
 1. Buka menu **Pengaturan WhatsGo**.
 2. Ketuk tombol merah **Bersihkan Cache & Cookie**.
@@ -73,7 +88,7 @@ Jika suatu saat WhatsApp menampilkan pesan seperti *"WhatsApp requires Google Ch
 
 ---
 
-## 6. Pemecahan Masalah (Troubleshooting)
+## 7. Pemecahan Masalah (Troubleshooting)
 
 ### Q: Halaman WhatsApp Web hanya putih / tidak mau memuat
 - Pastikan koneksi internet ponsel aktif dan stabil.
@@ -84,3 +99,6 @@ Jika suatu saat WhatsApp menampilkan pesan seperti *"WhatsApp requires Google Ch
 - Pastikan mode mobile 1-kolom sedang aktif (bukan mode desktop penuh).
 - Jika baru saja memuat halaman, tunggu hingga progress bar selesai (100%) agar skrip responsif terinjeksi sempurna.
 
+### Q: Notifikasi pesan baru tidak muncul saat layar mati
+- Pastikan opsi **Layanan Latar Belakang (Siaga)** dalam keadaan aktif di menu Pengaturan WhatsGo.
+- Di pengaturan HP Android Anda, pastikan izin notifikasi untuk aplikasi WhatsGo telah diizinkan dan batasan hemat baterai (*Battery Optimization*) diatur ke "Tidak dibatasi / Unrestricted".

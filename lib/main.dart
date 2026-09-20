@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'constants/app_constants.dart';
 import 'screens/webview_screen.dart';
+import 'services/foreground_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +16,9 @@ void main() async {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
+
+  // Initialize Android Foreground Service settings
+  AppForegroundService.init();
 
   runApp(const WhatsGoApp());
 }
@@ -71,4 +75,3 @@ class WhatsGoApp extends StatelessWidget {
     );
   }
 }
-

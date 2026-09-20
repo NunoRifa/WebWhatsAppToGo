@@ -38,6 +38,12 @@ WhatsGo dirancang agar **tahan masa depan (anti-obsolescence)**, responsif selay
 - Cookie, LocalStorage, dan database IndexedDB tersimpan secara permanen pada memori aplikasi.
 - Anda hanya perlu melakukan pemindaian QR Code **sekali saja** saat login pertama kali.
 
+### 6. 🔔 Foreground Service Siaga & Bridge Notifikasi Android
+- **Layanan Siaga Latar Belakang:** Menjaga koneksi proses jaringan dan WebSocket tetap hidup dengan notifikasi persisten status bar *"WhatsGo Siaga"*.
+- **Web Notification Bridge:** Mengintersepsi `window.Notification` dari WhatsApp Web secara lokal dan menampilkannya sebagai *Heads-up Notification* native Android dengan suara dan getaran.
+- **Privasi Pesan Masuk:** Opsi di Pengaturan untuk menyembunyikan cuplikan isi teks pesan pada layar kunci (*"Pesan baru diterima"*).
+- **Kontrol Penuh:** Sakelar ON/OFF di menu Pengaturan serta tombol aksi "Buka" dan "Hentikan" langsung dari panel notifikasi.
+
 ---
 
 ## 🏗️ Tech Stack & Arsitektur
@@ -46,8 +52,9 @@ WhatsGo dirancang agar **tahan masa depan (anti-obsolescence)**, responsif selay
 | :--- | :--- | :--- |
 | **Framework UI** | Flutter 3.x (Dart) | Material 3 Theming, Responsive Layout, Dialogs |
 | **Browser Engine** | `flutter_inappwebview` v6+ | Chromium-based Android System WebView, WebRTC, Service Workers |
+| **Background Service**| `flutter_foreground_task` | Android Foreground Service dengan Persistent Notification |
 | **Penyimpanan Lokal**| `shared_preferences` | User-Agent preference, Direct Chat history, Mode toggle |
-| **Native Bridge** | Android Kotlin MethodChannel | `moveTaskToBack` background keep-alive |
+| **Native Bridge** | Android Kotlin MethodChannel | `moveTaskToBack`, Native Notification Channels |
 | **Keamanan Data** | Direct Client-to-Server | 100% koneksi langsung ke server WhatsApp tanpa server perantara |
 
 Dokumentasi arsitektur lebih dalam dapat dibaca pada [**docs/ARCHITECTURE.md**](docs/ARCHITECTURE.md).
@@ -58,12 +65,15 @@ Dokumentasi arsitektur lebih dalam dapat dibaca pada [**docs/ARCHITECTURE.md**](
 
 ```
 WebWhatsAppToGo/
+├── .agents/
+│   └── rules/
+│       └── project_rules.md             # Pedoman & Aturan Wajib Proyek
 ├── android/                             # Konfigurasi Native Android
 │   ├── app/
 │   │   ├── build.gradle                 # Application ID: whatsgo.nunorifa.my.id
 │   │   └── src/main/
-│   │       ├── AndroidManifest.xml      # Izin Hardware & FileProvider
-│   │       └── kotlin/.../MainActivity.kt # Kotlin MethodChannel Handler
+│   │       ├── AndroidManifest.xml      # Izin Hardware, Notifikasi, FileProvider
+│   │       └── kotlin/.../MainActivity.kt # Kotlin MethodChannel & Notification Manager
 │   ├── build.gradle
 │   └── settings.gradle
 ├── docs/                                # Dokumentasi Lengkap
@@ -72,17 +82,20 @@ WebWhatsAppToGo/
 ├── lib/                                 # Kode Sumber Flutter (Dart)
 │   ├── constants/
 │   │   ├── app_constants.dart           # URL, Colors, Default Desktop UA
+│   │   ├── notification_scripts.dart    # Web Notification Interception JS
 │   │   └── responsive_scripts.dart      # Injeksi CSS/JS 1-Kolom & Observer
 │   ├── screens/
 │   │   └── webview_screen.dart          # Layar Utama InAppWebView & PopScope
 │   ├── services/
 │   │   ├── direct_chat_service.dart     # Logika sanitasi nomor & riwayat
+│   │   ├── foreground_service.dart      # Manajer Android Foreground Service
 │   │   └── user_agent_service.dart      # Layanan User-Agent SharedPreferences
 │   ├── widgets/
 │   │   ├── direct_chat_dialog.dart      # Dialog modal Direct Chat
 │   │   ├── error_view.dart              # Layar offline / koneksi error
 │   │   └── slim_app_bar.dart            # Auto-hide Slim Toolbar
 │   └── main.dart                        # Entrypoint & Material 3 Theming
+├── AGENTS.md                            # Pointer Aturan Agen Proyek
 ├── PRD.md                               # Product Requirements Document
 ├── pubspec.yaml                         # Spesifikasi Dependensi Flutter
 └── README.md                            # Dokumentasi Utama
@@ -128,7 +141,7 @@ WebWhatsAppToGo/
 
 - [x] **Milestone 1:** Inisialisasi Proyek, Konfigurasi Android (`whatsgo.nunorifa.my.id`), Setup Desktop UA Spoofing, dan Session Persistence.
 - [x] **Milestone 2:** Adaptasi Mobile Viewport (Injeksi CSS/JS 1-Kolom), Navigasi Back Cerdas, dan Fitur Direct Chat.
-- [ ] **Milestone 3:** Android Foreground Service dengan Persistent Notification untuk menjaga koneksi WebSocket di latar belakang.
+- [x] **Milestone 3:** Android Foreground Service dengan Persistent Notification dan Web Notification Bridge.
 - [ ] **Milestone 4:** Manajemen Unduhan & Upload Media Komprehensif (Voice Note mic, Camera/Gallery picker, Local Download Manager).
 - [ ] **Milestone 5:** Keamanan Biometrik (Fingerprint & Face Unlock) dan Fallback PIN.
 - [ ] **Milestone 6:** Hardening, Pengujian Baterai, dan Rilis Publik GitHub Releases / F-Droid.
@@ -138,4 +151,3 @@ WebWhatsAppToGo/
 ## ⚖️ Penafian (Disclaimer)
 
 Aplikasi ini adalah klien web pihak ketiga independen yang memuat antarmuka resmi WhatsApp Web. Aplikasi ini **tidak berafiliasi, disponsori, atau didukung secara resmi oleh WhatsApp LLC atau Meta Platforms, Inc.** WhatsApp adalah merek dagang terdaftar milik Meta Platforms, Inc.
-
