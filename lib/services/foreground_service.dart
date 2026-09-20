@@ -119,3 +119,4 @@ class AppForegroundService {
     return prefs.setBool(_prefKeyHidePreview, hide);
   }
 }
+
