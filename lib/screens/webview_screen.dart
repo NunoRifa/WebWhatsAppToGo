@@ -328,6 +328,37 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                     },
                   ),
 
+                  // Battery Optimization Exemption
+                  ListTile(
+                    leading: const Icon(Icons.battery_saver_outlined),
+                    title: const Text('Pengecualian Optimasi Baterai'),
+                    subtitle: const Text('Cegah Android mematikan koneksi siaga latar belakang'),
+                    trailing: const Icon(Icons.open_in_new, size: 18),
+                    onTap: () async {
+                      final isIgnoring = await AppForegroundService.isIgnoringBatteryOptimizations();
+                      if (isIgnoring) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('WhatsGo sudah dikecualikan dari batasan baterai sistem.'),
+                              backgroundColor: AppConstants.primaryTeal,
+                            ),
+                          );
+                        }
+                      } else {
+                        final requested = await AppForegroundService.requestIgnoreBatteryOptimization();
+                        if (!requested && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Buka Pengaturan Ponsel -> Baterai -> WhatsGo -> Pilih "Tidak Dibatasi".'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+
                   const Divider(),
 
                   // Security & Biometric Section

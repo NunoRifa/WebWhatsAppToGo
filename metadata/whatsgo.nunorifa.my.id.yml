@@ -1,0 +1,43 @@
+Categories:
+  - Internet
+  - Connectivity
+License: GPL-3.0-only
+SourceCode: https://github.com/nunorifa/WhatsGo
+IssueTracker: https://github.com/nunorifa/WhatsGo/issues
+
+AutoName: WhatsGo
+Summary: Modern WhatsApp Web Client for Android with Responsive 1-Column Layout
+
+Description: |
+  WhatsGo (WA Web To Go Reborn) is a modern Android client based on Flutter
+  and Android System InAppWebView for running WhatsApp Web seamlessly on smartphones.
+
+  Features:
+  * Responsive 1-column mobile layout with smart back-navigation
+  * Dynamic User-Agent editor preventing browser deprecation messages
+  * Native Android Foreground Service for real-time incoming message notifications
+  * Direct Chat without saving phone contacts
+  * Media upload & Blob download manager to local storage
+  * Biometric app lock (fingerprint/face) with device PIN/pattern fallback
+  * Battery optimization exemption support for background reliability
+
+RepoType: git
+Repo: https://github.com/nunorifa/WhatsGo.git
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: v1.0.0
+    output: build/app/outputs/flutter-apk/app-release.apk
+    srclib:
+      - flutter@stable
+    prebuild:
+      - $$flutter$$/bin/flutter pub get
+    build:
+      - $$flutter$$/bin/flutter build apk --release -t lib/main.dart --android-skip-build-dependency-validation
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1
+

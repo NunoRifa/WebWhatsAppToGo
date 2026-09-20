@@ -225,3 +225,35 @@ WhatsGo mengintegrasikan perlindungan biometrik level perangkat (*hardware-backe
 - Otomatis memicu *prompt* autentikasi saat layar tampil pertama kali menggunakan `addPostFrameCallback`.
 - Saat terkunci, tombol navigasi Back Android otomatis mengarahkan aplikasi ke latar belakang (`moveTaskToBack`), mencegah pengguna melewati lapisan autentikasi.
 
+---
+
+## 11. Arsitektur Hardening, Pengoptimalan Baterai & Distribusi Rilis (Milestone 6)
+
+### 11.1 Pengabaian Optimasi Baterai (Battery Optimization / Doze Mode Exemption)
+Sistem operasi Android (khususnya custom OEM ROM seperti Xiaomi HyperOS/MIUI, Samsung OneUI, ColorOS) memiliki manajemen daya agresif yang memutus soket jaringan dan mematikan background service saat layar mati dalam durasi lama.
+
+WhatsGo mengatasi hal ini melalui integrasi permintaan pengecualian optimasi baterai:
+- **Manifest:** Menyertakan izin `android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`.
+- **Layanan Siaga:** `AppForegroundService` mengekspos fungsi `isIgnoringBatteryOptimizations()` dan `requestIgnoreBatteryOptimization()`.
+- **Antarmuka Pengguna:** Di dalam Sheet Pengaturan -> Layanan Latar Belakang, pengguna dapat mengetuk opsi **"Pengecualian Optimasi Baterai"** untuk memicu dialog sistem Android native yang menempatkan WhatsGo ke dalam daftar putih (*whitelist*) Doze Mode.
+
+### 11.2 R8 / ProGuard Code Hardening & Minifikasi
+Untuk rilis publik yang aman dan berkinerja tinggi, WhatsGo menerapkan aturan R8/ProGuard khusus pada `android/app/proguard-rules.pro`:
+- **JavaScript Interface Bridge:** Mempertahankan method yang dianotasi `@JavascriptInterface` dan class bridge `com.pichillilorenzo.flutter_inappwebview_android.*` agar komunikasi injeksi skrip JavaScript (responsif CSS, intersepsi unduhan blob, bridge notifikasi) tidak terhapus (*stripped*) atau ter-obfuscate oleh compiler.
+- **Layanan Latar Belakang:** Menjaga class `com.pravera.flutter_foreground_task.*` dan service worker Android native agar pemanggilan siklus hidup background service tetap valid.
+- **Biometrik & Autentikasi:** Menjaga class `io.flutter.plugins.localauth.*` dan Android BiometricPrompt framework.
+- **AndroidX & Kotlin Coroutines:** Menjaga metadata refleksi untuk library runtime AndroidX dan Kotlin runtime.
+
+### 11.3 Pipeline Distribusi & Kemasan Multi-Arsitektur (Packaging)
+WhatsGo mengadopsi dua strategi kompilasi berkas rilis untuk efisiensi distribusi:
+1. **Split APKs per-ABI:**
+   - Menghasilkan berkas APK terpisah untuk `arm64-v8a` (~22.4 MB), `armeabi-v7a` (~19.9 MB), dan `x86_64` (~23.8 MB).
+   - Mengurangi ukuran unduhan hingga **>50%** dibandingkan APK universal karena hanya memuat library binary native (`.so`) yang dibutuhkan oleh arsitektur CPU perangkat target.
+2. **Universal Fat APK:**
+   - Menghasilkan satu berkas APK gabungan `whatsgo-v1.0.0-universal.apk` (~55.3 MB) yang mendukung semua ABI untuk memudahkan sideloading langsung oleh pengguna umum tanpa perlu memeriksa arsitektur CPU perangkat mereka.
+3. **Integritas & Otomasi Rilis:**
+   - **Skrip Build Lokal:** `scripts/build_release.ps1` mengotomatisasi kompilasi, penghitungan hash SHA-256 (`dist/release/checksums.txt`), dan verifikasi tanda tangan APK (`apksigner`).
+   - **GitHub Actions CI/CD:** `.github/workflows/release.yml` secara otomatis membangun berkas rilis dan mempublikasikannya ke GitHub Releases saat git tag rilis (misal `v1.0.0`) di-*push*.
+   - **F-Droid Recipe:** `metadata/whatsgo.nunorifa.my.id.yml` menyediakan spesifikasi metadata untuk pengajuan ke katalog repositori F-Droid open-source.
+
+

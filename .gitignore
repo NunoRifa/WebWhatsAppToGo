@@ -38,9 +38,13 @@ devtools_options.yaml
 **/android/gradlew
 **/android/gradlew.bat
 **/android/local.properties
+**/android/key.properties
 **/android/**/GeneratedPluginRegistrant.java
 .externalNativeBuild/
 .cxx/
 *.apk
 *.aab
+*.jks
+*.keystore
+/dist/
 

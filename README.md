@@ -56,6 +56,12 @@ WhatsGo dirancang agar **tahan masa depan (anti-obsolescence)**, responsif selay
 - **Waktu Kunci Otomatis (Timeout):** Fleksibilitas durasi penguncian otomatis saat aplikasi berada di latar belakang (*Segera, 1 Menit, 5 Menit, atau 15 Menit*).
 - **Editor User-Agent Interaktif:** Bebas menguji dan mengganti string User-Agent secara langsung dari menu aplikasi lengkap dengan opsi preset (Desktop Chrome, Mobile Chrome, Safari macOS) dan tombol reset ke default.
 
+### 9. 🔋 Pengabaian Optimasi Baterai & Rilis Multi-Arsitektur (Hardening & Packaging)
+- **Pengecualian Doze Mode (Battery Optimization):** Menu di Pengaturan untuk meminta izin sistem Android agar proses WhatsGo tidak dihentikan secara agresif oleh penghemat baterai vendor (*OEM Doze Mode killer*).
+- **R8 / ProGuard Code Hardening:** Minifikasi kode produksi dengan aturan proteksi menyeluruh untuk JavaScript bridge (`InAppWebView`), Android Foreground Task, dan Biometrik.
+- **Distribusi Multi-Arsitektur (Split APK):** APK teroptimasi per arsitektur CPU (`arm64-v8a`, `armeabi-v7a`, `x86_64`) berukuran sangat ramping (~19-23 MB) serta Universal APK (~55 MB).
+- **Otomasi CI/CD & F-Droid Ready:** Skrip rilis otomatis `scripts/build_release.ps1`, GitHub Actions workflow (`.github/workflows/release.yml`), dan metadata resep F-Droid (`metadata/whatsgo.nunorifa.my.id.yml`).
+
 ---
 
 ## 🏗️ Tech Stack & Arsitektur
@@ -174,17 +180,41 @@ flutter run -d emulator-5554 --android-skip-build-dependency-validation
 
 ---
 
-### 📦 Membangun Berkas APK
+### 📦 Membangun Berkas APK & Rilis Publik
 
+#### 1. Build Otomatis Rilis Lengkap (Universal & Split per-ABI)
+Gunakan skrip otomasi yang telah disediakan untuk menghasilkan APK release Universal dan Split APK per arsitektur CPU, menghitung checksum SHA-256, serta memverifikasi tanda tangan APK:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/build_release.ps1 -Version "1.0.0"
+```
+
+Semua berkas hasil build akan ditempatkan di folder `dist/release/`:
+- `whatsgo-v1.0.0-universal.apk`: Kompatibel untuk semua ponsel Android (sideload langsung).
+- `whatsgo-v1.0.0-arm64-v8a.apk`: Khusus perangkat 64-bit modern (ukuran sangat ringan).
+- `whatsgo-v1.0.0-armeabi-v7a.apk`: Khusus perangkat 32-bit lawas.
+- `whatsgo-v1.0.0-x86_64.apk`: Khusus emulator Android atau perangkat berbasis Intel/AMD.
+- `checksums.txt`: Berkas hash SHA-256 untuk verifikasi integritas berkas.
+
+#### 2. Tabel Verifikasi Integritas Berkas (Release Artifacts & SHA-256)
+
+| Nama Berkas APK | Target Arsitektur | Ukuran | Hash SHA-256 |
+| :--- | :--- | :--- | :--- |
+| `whatsgo-v1.0.0-universal.apk` | Universal (Semua ABI) | ~55.3 MB | `5ddea2c5f64e5615e1423ce393216007e6f4938a89e9475852324bd03e7e4b30` |
+| `whatsgo-v1.0.0-arm64-v8a.apk` | ARM 64-bit (Modern) | ~22.4 MB | `9b4670b362718a02728293af4ec7c6e662763d4088ef9ab8972adbac3a826b73` |
+| `whatsgo-v1.0.0-armeabi-v7a.apk` | ARM 32-bit (Legacy) | ~19.9 MB | `81a6e7dfd0d249e119d5d3d2d2279577081056bda4759ca0e1fd04f0093a0e5d` |
+| `whatsgo-v1.0.0-x86_64.apk` | x86 64-bit (Emulator/PC) | ~23.8 MB | `e0c412b6d1ba06d5eedfd8855cfef51f6951f53572eb23e6a4fc5622dd4e39d0` |
+
+#### 3. Build Manual (Debug / Release Biasa)
 - **Build APK Debug:**
   ```bash
-  flutter build apk --debug --android-skip-build-dependency-validation
+  flutter build apk --debug -t lib/main.dart --android-skip-build-dependency-validation
   ```
   *Output:* `build/app/outputs/flutter-apk/app-debug.apk`
 
-- **Build APK Release:**
+- **Build APK Release Standar:**
   ```bash
-  flutter build apk --release --android-skip-build-dependency-validation
+  flutter build apk --release -t lib/main.dart --android-skip-build-dependency-validation
   ```
   *Output:* `build/app/outputs/flutter-apk/app-release.apk`
 
@@ -214,7 +244,7 @@ flutter run -d emulator-5554 --android-skip-build-dependency-validation
 - [x] **Milestone 3:** Android Foreground Service dengan Persistent Notification dan Web Notification Bridge.
 - [x] **Milestone 4:** Manajemen Unduhan & Upload Media Komprehensif (Voice Note mic, Camera/Gallery picker, Local Download Manager).
 - [x] **Milestone 5:** Keamanan Biometrik (Fingerprint & Face Unlock) dan Fallback PIN.
-- [ ] **Milestone 6:** Hardening, Pengujian Baterai, dan Rilis Publik GitHub Releases / F-Droid.
+- [x] **Milestone 6:** Hardening, Pengujian Baterai, dan Rilis Publik GitHub Releases / F-Droid.
 
 ---
 

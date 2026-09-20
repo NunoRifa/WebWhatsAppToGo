@@ -1,0 +1,9 @@
+# Template Konfigurasi Keystore Rilis WhatsGo
+# Salin berkas ini menjadi 'key.properties' di direktori 'android/'
+# dan sesuaikan dengan path serta password keystore Anda.
+
+storePassword=YOUR_STORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+storeFile=whatsgo-release.jks
+

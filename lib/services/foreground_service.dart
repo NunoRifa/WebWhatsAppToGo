@@ -117,4 +117,22 @@ class AppForegroundService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.setBool(_prefKeyHidePreview, hide);
   }
+
+  /// Check whether the app is whitelisted from Android battery optimizations (Doze mode)
+  static Future<bool> isIgnoringBatteryOptimizations() async {
+    try {
+      return await FlutterForegroundTask.isIgnoringBatteryOptimizations;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Request system to ignore battery optimizations for WhatsGo
+  static Future<bool> requestIgnoreBatteryOptimization() async {
+    try {
+      return await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+    } catch (e) {
+      return false;
+    }
+  }
 }
