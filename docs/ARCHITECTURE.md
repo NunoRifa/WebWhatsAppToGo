@@ -19,19 +19,23 @@ Dokumen ini menjelaskan rancangan arsitektur teknis dari aplikasi **WhatsGo** (*
 │  ├── WebSettings: Desktop UA, DOM Storage, WebRTC      │
 │  ├── Pre-document Script:                              │
 │  │    ├── Win32 & Google Inc. Platform Spoofing        │
-│  │    └── window.Notification Interception Bridge      │
+│  │    ├── window.Notification Interception Bridge      │
+│  │    └── HTMLAnchorElement Blob Download Interceptor  │
 │  └── onLoadStop Injection:                             │
 │       ├── Responsive CSS (1-Column Layout)             │
 │       └── MutationObserver JS (#side vs #main)         │
 ├────────────────────────────────────────────────────────┤
 │  Native Android Layer (Kotlin MainActivity)            │
 │  ├── MethodChannel: moveTaskToBack(true)               │
+│  ├── FileProvider: whatsgo.nunorifa.my.id.fileprovider │
 │  └── Notification Channels:                            │
 │       ├── whatsgo_foreground_service (Status Bar Low)  │
-│       └── whatsgo_messages_channel (Heads-Up High)     │
+│       ├── whatsgo_messages_channel (Heads-Up High)     │
+│       └── whatsgo_downloads_channel (Downloads Default)│
 ├────────────────────────────────────────────────────────┤
 │  Komponen Utilitas & Latar Belakang                    │
 │  ├── AppForegroundService (flutter_foreground_task)    │
+│  ├── DownloadService (/storage/.../Download/WhatsGo)   │
 │  └── DirectChatDialog + DirectChatService (+62 format) │
 └───────────────────────────┬────────────────────────────┘
                             │ (Direct HTTPS / WSS)
@@ -66,6 +70,8 @@ InAppWebViewSettings(
   useHybridComposition: true,   // Performa render hardware-accelerated optimal
   allowFileAccessFromFileURLs: true,
   allowUniversalAccessFromFileURLs: true,
+  allowFileAccess: true,
+  allowContentAccess: true,
   allowsInlineMediaPlayback: true,
   cacheMode: CacheMode.LOAD_DEFAULT,
 )
@@ -165,7 +171,28 @@ WhatsApp Web memicu pesan masuk menggunakan API browser standar `new Notificatio
 
 ---
 
-## 7. Strategi Anti-Obsolescence (Tahan Masa Depan)
+## 7. Manajemen Unduhan & Media Komprehensif
+
+### 7.1 Perekaman Voice Note & Kamera/Galeri
+- Permintaan WebRTC (`navigator.mediaDevices.getUserMedia`) dicegat melalui callback `onPermissionRequest`.
+- Aplikasi meminta izin runtime Android (`Permission.camera` dan `Permission.microphone`) secara dinamis dan memberikan persetujuan ke Chromium engine.
+
+### 7.2 Intersepsi Unduhan Berkas Enkripsi Blob
+Media terenkripsi WhatsApp Web diunduh melalui `blob:` URI buatan JavaScript.
+1. `DownloadScripts.blobInterceptorScript` mencegat event `.click()` pada elemen jangkar (`<a>`) yang memiliki atribut `download` atau `href="blob:..."`.
+2. Skrip mengambil blob melalui API `fetch(href)` dan mengonversinya menjadi string Base64 menggunakan `FileReader`.
+3. Data Base64 dikirim ke Flutter melalui `window.flutter_inappwebview.callHandler('onBlobDownloadRequest', ...)`.
+4. `DownloadService` menulis file ke direktori publik `/storage/emulated/0/Download/WhatsGo/`.
+
+### 7.3 Android FileProvider & Notifikasi Selesai
+Setelah file disimpan:
+- Native Kotlin memicu notifikasi pada `whatsgo_downloads_channel`.
+- Notifikasi disematkan `PendingIntent` dengan `Intent.ACTION_VIEW` dan `FileProvider.getUriForFile` (`whatsgo.nunorifa.my.id.fileprovider`).
+- Pengguna dapat mengetuk tombol **"Buka Berkas"** untuk langsung membuka dokumen atau media di aplikasi default ponsel.
+
+---
+
+## 8. Strategi Anti-Obsolescence (Tahan Masa Depan)
 
 Aplikasi klien WhatsApp Web lama umumnya gagal karena string User-Agent di-hardcode ke versi browser lama. Ketika WhatsApp menaikkan syarat minimum browser, seluruh aplikasi menjadi rusak.
 
@@ -175,7 +202,7 @@ WhatsGo mengatasi masalah ini dengan dua lapis perlindungan:
 
 ---
 
-## 8. Jaminan Keamanan & Privasi Data
+## 9. Jaminan Keamanan & Privasi Data
 
 - **Zero Middleware Server:** Tidak ada peladen (server) perantara atau API proxy yang digunakan. Seluruh lalu lintas data bergerak langsung antara WebView perangkat dengan server resmi `*.whatsapp.com`.
 - **Enkripsi End-to-End Bawaan:** Enkripsi end-to-end asli WhatsApp Web tetap berjalan secara utuh melalui mesin Web Cryptography API di dalam WebView.

@@ -6,9 +6,11 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../constants/app_constants.dart';
+import '../constants/download_scripts.dart';
 import '../constants/notification_scripts.dart';
 import '../constants/responsive_scripts.dart';
 import '../services/direct_chat_service.dart';
+import '../services/download_service.dart';
 import '../services/foreground_service.dart';
 import '../services/user_agent_service.dart';
 import '../widgets/direct_chat_dialog.dart';
@@ -51,7 +53,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
     final serviceEnabled = await AppForegroundService.isServiceEnabledPreference();
     final hidePreview = await AppForegroundService.isHidePreviewPreference();
 
-    // Request notification permissions for Android 13+
+    // Request notification & media permissions for Android
     await Permission.notification.request();
 
     if (mounted) {
@@ -85,6 +87,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
       useHybridComposition: true,
       allowFileAccessFromFileURLs: true,
       allowUniversalAccessFromFileURLs: true,
+      allowFileAccess: true,
+      allowContentAccess: true,
       allowsInlineMediaPlayback: true,
       transparentBackground: false,
       cacheMode: CacheMode.LOAD_DEFAULT,
@@ -99,6 +103,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
       ),
       UserScript(
         source: NotificationScripts.notificationInterceptionScript,
+        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+      ),
+      UserScript(
+        source: DownloadScripts.blobInterceptorScript,
         injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
       ),
     ]);
@@ -315,7 +323,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   ListTile(
                     leading: const Icon(Icons.info_outline),
                     title: const Text('Tentang WhatsGo'),
-                    subtitle: const Text('WA Web To Go Reborn - v1.0.0 (Milestone 3)'),
+                    subtitle: const Text('WA Web To Go Reborn - v1.0.0 (Milestone 4)'),
                     onTap: () {
                       Navigator.pop(context);
                       showAboutDialog(
@@ -516,10 +524,92 @@ class _WebViewScreenState extends State<WebViewScreen> {
                           }
                         },
                       );
+
+                      // Register JavaScript Handler for Blob file downloads
+                      controller.addJavaScriptHandler(
+                        handlerName: 'onBlobDownloadRequest',
+                        callback: (args) async {
+                          if (args.isNotEmpty && args[0] is Map) {
+                            final data = Map<String, dynamic>.from(args[0] as Map);
+                            final filename = (data['filename'] ?? 'whatsgo_media').toString();
+                            final mimeType = (data['mimeType'] ?? 'application/octet-stream').toString();
+                            final base64Data = (data['base64Data'] ?? '').toString();
+
+                            if (base64Data.isNotEmpty) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Mengunduh: $filename...'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+
+                              final file = await DownloadService.saveBase64Data(
+                                filename: filename,
+                                base64Data: base64Data,
+                                mimeType: mimeType,
+                              );
+
+                              if (file != null && mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Tersimpan di Download/WhatsGo: $filename'),
+                                    backgroundColor: AppConstants.primaryTeal,
+                                    action: SnackBarAction(
+                                      label: 'Buka',
+                                      textColor: AppConstants.accentGreen,
+                                      onPressed: () {
+                                        DownloadService.openFileDirectly(file.path, mimeType);
+                                      },
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                        },
+                      );
                     },
                     onPermissionRequest: (controller, request) async {
                       await _handlePermissionRequest(controller, request);
                       return null;
+                    },
+                    onDownloadStartRequest: (controller, downloadStartRequest) async {
+                      final url = downloadStartRequest.url.toString();
+                      final suggestedFilename = downloadStartRequest.suggestedFilename ?? 'whatsgo_file';
+                      final mimeType = downloadStartRequest.mimeType ?? 'application/octet-stream';
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Mengunduh $suggestedFilename...'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+
+                      final file = await DownloadService.downloadHttpUrl(
+                        url: url,
+                        suggestedFilename: suggestedFilename,
+                        mimeType: mimeType,
+                      );
+
+                      if (file != null && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Tersimpan di Download/WhatsGo: $suggestedFilename'),
+                            backgroundColor: AppConstants.primaryTeal,
+                            action: SnackBarAction(
+                              label: 'Buka',
+                              textColor: AppConstants.accentGreen,
+                              onPressed: () {
+                                DownloadService.openFileDirectly(file.path, mimeType);
+                              },
+                            ),
+                          ),
+                        );
+                      }
                     },
                     onLoadStart: (controller, url) {
                       setState(() {
@@ -543,9 +633,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       });
                       // Apply responsive single-column layout
                       await _applyResponsiveMode();
-                      // Ensure notification interception is active
+                      // Ensure notification and download scripts are active
                       await controller.evaluateJavascript(
                         source: NotificationScripts.notificationInterceptionScript,
+                      );
+                      await controller.evaluateJavascript(
+                        source: DownloadScripts.blobInterceptorScript,
                       );
                     },
                     onReceivedError: (controller, request, error) {

@@ -52,7 +52,32 @@ Direct Chat memungkinkan Anda mengirim pesan ke nomor WhatsApp baru tanpa perlu 
 
 ---
 
-## 4. Layanan Latar Belakang & Pengaturan Notifikasi
+## 4. Voice Note & Pengiriman Media
+
+### 4.1 Merekam Pesan Suara (Voice Note)
+- Ketuk ikon **Mikrofon** di pojok kanan bawah kolom input chat WhatsApp Web.
+- Saat pertama kali digunakan, sistem Android akan menampilkan dialog izin mikrofon. Pilih **"Izinkan saat aplikasi digunakan"**.
+- Rekam suara Anda dan ketuk tombol kirim seperti biasa.
+
+### 4.2 Mengirim Foto, Video, dan Dokumen
+- Ketuk ikon **Klip Kertas (Lampiran)** atau **Kamera** di WhatsApp Web.
+- Pilih berkas dari Galeri atau File Manager ponsel Anda.
+
+---
+
+## 5. Mengunduh dan Membuka Berkas
+
+WhatsGo mendukung pengunduhan seluruh tipe dokumen, foto, audio, dan video:
+
+1. Ketuk ikon unduh pada dokumen, media, atau foto di dalam chat.
+2. Banner notifikasi SnackBar akan muncul mengonfirmasi bahwa unduhan sedang berlangsung.
+3. **Lokasi Berkas:** Semua file tersimpan otomatis di direktori publik ponsel Anda:
+   📁 **`Download/WhatsGo/`** (langsung muncul di Galeri & File Manager).
+4. **Notifikasi Buka Cepat:** Notifikasi Android akan muncul bertuliskan *"Unduhan Selesai"*. Ketuk notifikasi atau tombol **"Buka Berkas"** untuk langsung membukanya di aplikasi penampil PDF/Foto bawaan ponsel.
+
+---
+
+## 6. Layanan Latar Belakang & Pengaturan Notifikasi
 
 WhatsGo dilengkapi layanan latar belakang (*Foreground Service*) agar pesan baru tetap masuk secara tepat waktu:
 
@@ -67,7 +92,7 @@ WhatsGo dilengkapi layanan latar belakang (*Foreground Service*) agar pesan baru
 
 ---
 
-## 5. Konfigurasi User-Agent (Jika WhatsApp Minta Update Browser)
+## 7. Konfigurasi User-Agent (Jika WhatsApp Minta Update Browser)
 
 Jika suatu saat WhatsApp menampilkan pesan seperti *"WhatsApp requires Google Chrome 60+"* atau memblokir akses browser:
 
@@ -79,7 +104,7 @@ Jika suatu saat WhatsApp menampilkan pesan seperti *"WhatsApp requires Google Ch
 
 ---
 
-## 6. Keluar / Ganti Akun (Logout)
+## 8. Keluar / Ganti Akun (Logout)
 
 1. Buka menu **Pengaturan WhatsGo**.
 2. Ketuk tombol merah **Bersihkan Cache & Cookie**.
@@ -88,7 +113,13 @@ Jika suatu saat WhatsApp menampilkan pesan seperti *"WhatsApp requires Google Ch
 
 ---
 
-## 7. Pemecahan Masalah (Troubleshooting)
+## 9. Pemecahan Masalah (Troubleshooting)
+
+### Q: Mikrofon tidak merekam suara saat membuat Voice Note
+- Periksa pengaturan aplikasi di HP: `Pengaturan HP -> Aplikasi -> WhatsGo -> Izin -> Mikrofon` pastikan disetel ke **"Izinkan"**.
+
+### Q: File yang diunduh tidak ditemukan di Galeri
+- Buka aplikasi **File Manager** bawaan HP Anda, lalu navigasikan ke folder `Penyimpanan Internal -> Download -> WhatsGo`.
 
 ### Q: Halaman WhatsApp Web hanya putih / tidak mau memuat
 - Pastikan koneksi internet ponsel aktif dan stabil.
@@ -98,7 +129,3 @@ Jika suatu saat WhatsApp menampilkan pesan seperti *"WhatsApp requires Google Ch
 ### Q: Tombol Back langsung keluar dari aplikasi saat di dalam obrolan
 - Pastikan mode mobile 1-kolom sedang aktif (bukan mode desktop penuh).
 - Jika baru saja memuat halaman, tunggu hingga progress bar selesai (100%) agar skrip responsif terinjeksi sempurna.
-
-### Q: Notifikasi pesan baru tidak muncul saat layar mati
-- Pastikan opsi **Layanan Latar Belakang (Siaga)** dalam keadaan aktif di menu Pengaturan WhatsGo.
-- Di pengaturan HP Android Anda, pastikan izin notifikasi untuk aplikasi WhatsGo telah diizinkan dan batasan hemat baterai (*Battery Optimization*) diatur ke "Tidak dibatasi / Unrestricted".

@@ -11,12 +11,17 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.FileProvider
+import java.io.File
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "whatsgo.nunorifa.my.id/app"
     private val MESSAGE_CHANNEL_ID = "whatsgo_messages_channel"
+    private val DOWNLOAD_CHANNEL_ID = "whatsgo_downloads_channel"
+    private val FILE_PROVIDER_AUTHORITY = "whatsgo.nunorifa.my.id.fileprovider"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,17 +32,31 @@ class MainActivity: FlutterActivity() {
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "Pesan Masuk WhatsGo"
-            val descriptionText = "Notifikasi saat ada pesan WhatsApp baru masuk"
-            val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(MESSAGE_CHANNEL_ID, name, importance).apply {
-                description = descriptionText
+            val notificationManager: NotificationManager =
+                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // Messages Channel (High priority heads-up)
+            val msgChannel = NotificationChannel(
+                MESSAGE_CHANNEL_ID,
+                "Pesan Masuk WhatsGo",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifikasi saat ada pesan WhatsApp baru masuk"
                 enableVibration(true)
                 enableLights(true)
             }
-            val notificationManager: NotificationManager =
-                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+            notificationManager.createNotificationChannel(msgChannel)
+
+            // Downloads Channel (Default priority with open action)
+            val downloadChannel = NotificationChannel(
+                DOWNLOAD_CHANNEL_ID,
+                "Unduhan WhatsGo",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Notifikasi saat unduhan media atau dokumen selesai"
+                enableVibration(true)
+            }
+            notificationManager.createNotificationChannel(downloadChannel)
         }
     }
 
@@ -46,7 +65,6 @@ class MainActivity: FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "moveTaskToBack" -> {
-                    // Send app to background without killing process/WebSocket
                     moveTaskToBack(true)
                     result.success(true)
                 }
@@ -56,6 +74,21 @@ class MainActivity: FlutterActivity() {
                     val hidePreview = call.argument<Boolean>("hidePreview") ?: false
 
                     showNativeMessageNotification(title, body, hidePreview)
+                    result.success(true)
+                }
+                "showDownloadNotification" -> {
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    val fileName = call.argument<String>("fileName") ?: "Berkas"
+                    val mimeType = call.argument<String>("mimeType") ?: "*/*"
+
+                    showNativeDownloadNotification(filePath, fileName, mimeType)
+                    result.success(true)
+                }
+                "openFileDirectly" -> {
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    val mimeType = call.argument<String>("mimeType") ?: "*/*"
+
+                    openFileWithProvider(filePath, mimeType)
                     result.success(true)
                 }
                 else -> {
@@ -94,7 +127,65 @@ class MainActivity: FlutterActivity() {
             val notificationId = (title.hashCode() and 0x7FFFFFFF) % 10000 + 2000
             notificationManager.notify(notificationId, builder.build())
         } catch (e: SecurityException) {
-            // Android 13+ permission not yet granted
+            e.printStackTrace()
+        }
+    }
+
+    private fun showNativeDownloadNotification(filePath: String, fileName: String, mimeType: String) {
+        val file = File(filePath)
+        if (!file.exists()) return
+
+        try {
+            val fileUri: Uri = FileProvider.getUriForFile(this, FILE_PROVIDER_AUTHORITY, file)
+            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(fileUri, mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            val notificationId = (filePath.hashCode() and 0x7FFFFFFF) % 10000 + 5000
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                notificationId,
+                viewIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val iconRes = applicationInfo.icon.takeIf { it != 0 } ?: android.R.drawable.stat_sys_download_done
+
+            val builder = NotificationCompat.Builder(this, DOWNLOAD_CHANNEL_ID)
+                .setSmallIcon(iconRes)
+                .setContentTitle("Unduhan Selesai")
+                .setContentText(fileName)
+                .setSubText("Download/WhatsGo")
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .addAction(
+                    android.R.drawable.ic_menu_view,
+                    "Buka Berkas",
+                    pendingIntent
+                )
+
+            val notificationManager = NotificationManagerCompat.from(this)
+            notificationManager.notify(notificationId, builder.build())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun openFileWithProvider(filePath: String, mimeType: String) {
+        val file = File(filePath)
+        if (!file.exists()) return
+
+        try {
+            val fileUri: Uri = FileProvider.getUriForFile(this, FILE_PROVIDER_AUTHORITY, file)
+            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(fileUri, mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(viewIntent)
+        } catch (e: Exception) {
             e.printStackTrace()
         }
     }

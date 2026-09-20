@@ -44,6 +44,12 @@ WhatsGo dirancang agar **tahan masa depan (anti-obsolescence)**, responsif selay
 - **Privasi Pesan Masuk:** Opsi di Pengaturan untuk menyembunyikan cuplikan isi teks pesan pada layar kunci (*"Pesan baru diterima"*).
 - **Kontrol Penuh:** Sakelar ON/OFF di menu Pengaturan serta tombol aksi "Buka" dan "Hentikan" langsung dari panel notifikasi.
 
+### 7. 📥 Manajemen Unduhan & Media Komprehensif
+- **Perekaman Voice Note:** Izin dinamis mikrofon saat tombol rekam suara ditekan di WhatsApp Web.
+- **Upload Media:** Akses kamera dan galeri file picker untuk mengirim foto, video, dan dokumen.
+- **Local Download Manager:** Menangkap unduhan berkas standar dan enkripsi `blob:` URL WhatsApp Web, menyimpannya ke folder publik `Download/WhatsGo/`.
+- **Notifikasi Buka File:** Notifikasi Android dengan tombol "Buka Berkas" via Android `FileProvider` untuk langsung meluncurkan viewer eksternal (PDF, Galeri, Player).
+
 ---
 
 ## 🏗️ Tech Stack & Arsitektur
@@ -53,8 +59,9 @@ WhatsGo dirancang agar **tahan masa depan (anti-obsolescence)**, responsif selay
 | **Framework UI** | Flutter 3.x (Dart) | Material 3 Theming, Responsive Layout, Dialogs |
 | **Browser Engine** | `flutter_inappwebview` v6+ | Chromium-based Android System WebView, WebRTC, Service Workers |
 | **Background Service**| `flutter_foreground_task` | Android Foreground Service dengan Persistent Notification |
+| **Penyimpanan Berkas**| `DownloadService` & FileProvider | Menyimpan ke `Download/WhatsGo`, Intent ACTION_VIEW |
 | **Penyimpanan Lokal**| `shared_preferences` | User-Agent preference, Direct Chat history, Mode toggle |
-| **Native Bridge** | Android Kotlin MethodChannel | `moveTaskToBack`, Native Notification Channels |
+| **Native Bridge** | Android Kotlin MethodChannel | `moveTaskToBack`, Native Notification Channels, FileProvider |
 | **Keamanan Data** | Direct Client-to-Server | 100% koneksi langsung ke server WhatsApp tanpa server perantara |
 
 Dokumentasi arsitektur lebih dalam dapat dibaca pada [**docs/ARCHITECTURE.md**](docs/ARCHITECTURE.md).
@@ -82,12 +89,14 @@ WebWhatsAppToGo/
 ├── lib/                                 # Kode Sumber Flutter (Dart)
 │   ├── constants/
 │   │   ├── app_constants.dart           # URL, Colors, Default Desktop UA
+│   │   ├── download_scripts.dart        # Blob Download Interception JS
 │   │   ├── notification_scripts.dart    # Web Notification Interception JS
 │   │   └── responsive_scripts.dart      # Injeksi CSS/JS 1-Kolom & Observer
 │   ├── screens/
 │   │   └── webview_screen.dart          # Layar Utama InAppWebView & PopScope
 │   ├── services/
-│   │   ├── direct_chat_service.dart     # Logika sanitasi nomor & riwayat
+│   ├── direct_chat_service.dart     # Logika sanitasi nomor & riwayat
+│   │   ├── download_service.dart        # Manajemen unduhan & penyimpanan lokal
 │   │   ├── foreground_service.dart      # Manajer Android Foreground Service
 │   │   └── user_agent_service.dart      # Layanan User-Agent SharedPreferences
 │   ├── widgets/
@@ -142,7 +151,7 @@ WebWhatsAppToGo/
 - [x] **Milestone 1:** Inisialisasi Proyek, Konfigurasi Android (`whatsgo.nunorifa.my.id`), Setup Desktop UA Spoofing, dan Session Persistence.
 - [x] **Milestone 2:** Adaptasi Mobile Viewport (Injeksi CSS/JS 1-Kolom), Navigasi Back Cerdas, dan Fitur Direct Chat.
 - [x] **Milestone 3:** Android Foreground Service dengan Persistent Notification dan Web Notification Bridge.
-- [ ] **Milestone 4:** Manajemen Unduhan & Upload Media Komprehensif (Voice Note mic, Camera/Gallery picker, Local Download Manager).
+- [x] **Milestone 4:** Manajemen Unduhan & Upload Media Komprehensif (Voice Note mic, Camera/Gallery picker, Local Download Manager).
 - [ ] **Milestone 5:** Keamanan Biometrik (Fingerprint & Face Unlock) dan Fallback PIN.
 - [ ] **Milestone 6:** Hardening, Pengujian Baterai, dan Rilis Publik GitHub Releases / F-Droid.
 
