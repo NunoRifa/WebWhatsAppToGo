@@ -50,6 +50,12 @@ WhatsGo dirancang agar **tahan masa depan (anti-obsolescence)**, responsif selay
 - **Local Download Manager:** Menangkap unduhan berkas standar dan enkripsi `blob:` URL WhatsApp Web, menyimpannya ke folder publik `Download/WhatsGo/`.
 - **Notifikasi Buka File:** Notifikasi Android dengan tombol "Buka Berkas" via Android `FileProvider` untuk langsung meluncurkan viewer eksternal (PDF, Galeri, Player).
 
+### 8. 🔐 Keamanan Biometrik & Pengaturan Lanjutan
+- **Kunci Sidik Jari & Wajah:** Autentikasi biometrik native Android (`local_auth`) dengan fallback aman PIN, Pola, atau Sandi perangkat bawaan sistem (Keyguard TEE/Keystore).
+- **Layar Kunci Privasi (Privacy Lock Overlay):** Menutupi seluruh tampilan obrolan saat aplikasi terkunci guna mencegah kebocoran pesan di panel Recent Apps / App Switcher.
+- **Waktu Kunci Otomatis (Timeout):** Fleksibilitas durasi penguncian otomatis saat aplikasi berada di latar belakang (*Segera, 1 Menit, 5 Menit, atau 15 Menit*).
+- **Editor User-Agent Interaktif:** Bebas menguji dan mengganti string User-Agent secara langsung dari menu aplikasi lengkap dengan opsi preset (Desktop Chrome, Mobile Chrome, Safari macOS) dan tombol reset ke default.
+
 ---
 
 ## 🏗️ Tech Stack & Arsitektur
@@ -59,6 +65,7 @@ WhatsGo dirancang agar **tahan masa depan (anti-obsolescence)**, responsif selay
 | **Framework UI** | Flutter 3.x (Dart) | Material 3 Theming, Responsive Layout, Dialogs |
 | **Browser Engine** | `flutter_inappwebview` v6+ | Chromium-based Android System WebView, WebRTC, Service Workers |
 | **Background Service**| `flutter_foreground_task` | Android Foreground Service dengan Persistent Notification |
+| **Keamanan Biometrik**| `local_auth` | Fingerprint, Face Unlock & Hardware Device Credential Fallback |
 | **Penyimpanan Berkas**| `DownloadService` & FileProvider | Menyimpan ke `Download/WhatsGo`, Intent ACTION_VIEW |
 | **Penyimpanan Lokal**| `shared_preferences` | User-Agent preference, Direct Chat history, Mode toggle |
 | **Native Bridge** | Android Kotlin MethodChannel | `moveTaskToBack`, Native Notification Channels, FileProvider |
@@ -95,14 +102,17 @@ WebWhatsAppToGo/
 │   ├── screens/
 │   │   └── webview_screen.dart          # Layar Utama InAppWebView & PopScope
 │   ├── services/
-│   ├── direct_chat_service.dart     # Logika sanitasi nomor & riwayat
+│   │   ├── biometric_service.dart       # Autentikasi biometrik & manajemen timeout
+│   │   ├── direct_chat_service.dart     # Logika sanitasi nomor & riwayat
 │   │   ├── download_service.dart        # Manajemen unduhan & penyimpanan lokal
 │   │   ├── foreground_service.dart      # Manajer Android Foreground Service
 │   │   └── user_agent_service.dart      # Layanan User-Agent SharedPreferences
 │   ├── widgets/
 │   │   ├── direct_chat_dialog.dart      # Dialog modal Direct Chat
 │   │   ├── error_view.dart              # Layar offline / koneksi error
-│   │   └── slim_app_bar.dart            # Auto-hide Slim Toolbar
+│   │   ├── lock_overlay.dart            # Layar penutup privasi gembok biometrik
+│   │   ├── slim_app_bar.dart            # Auto-hide Slim Toolbar
+│   │   └── user_agent_dialog.dart       # Dialog editor User-Agent dinamis
 │   └── main.dart                        # Entrypoint & Material 3 Theming
 ├── AGENTS.md                            # Pointer Aturan Agen Proyek
 ├── PRD.md                               # Product Requirements Document
@@ -203,7 +213,7 @@ flutter run -d emulator-5554 --android-skip-build-dependency-validation
 - [x] **Milestone 2:** Adaptasi Mobile Viewport (Injeksi CSS/JS 1-Kolom), Navigasi Back Cerdas, dan Fitur Direct Chat.
 - [x] **Milestone 3:** Android Foreground Service dengan Persistent Notification dan Web Notification Bridge.
 - [x] **Milestone 4:** Manajemen Unduhan & Upload Media Komprehensif (Voice Note mic, Camera/Gallery picker, Local Download Manager).
-- [ ] **Milestone 5:** Keamanan Biometrik (Fingerprint & Face Unlock) dan Fallback PIN.
+- [x] **Milestone 5:** Keamanan Biometrik (Fingerprint & Face Unlock) dan Fallback PIN.
 - [ ] **Milestone 6:** Hardening, Pengujian Baterai, dan Rilis Publik GitHub Releases / F-Droid.
 
 ---

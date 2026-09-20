@@ -8,12 +8,15 @@ import '../constants/app_constants.dart';
 import '../constants/download_scripts.dart';
 import '../constants/notification_scripts.dart';
 import '../constants/responsive_scripts.dart';
+import '../services/biometric_service.dart';
 import '../services/download_service.dart';
 import '../services/foreground_service.dart';
 import '../services/user_agent_service.dart';
 import '../widgets/direct_chat_dialog.dart';
 import '../widgets/error_view.dart';
+import '../widgets/lock_overlay.dart';
 import '../widgets/slim_app_bar.dart';
+import '../widgets/user_agent_dialog.dart';
 
 class WebViewScreen extends StatefulWidget {
   const WebViewScreen({super.key});
@@ -22,7 +25,7 @@ class WebViewScreen extends StatefulWidget {
   State<WebViewScreen> createState() => _WebViewScreenState();
 }
 
-class _WebViewScreenState extends State<WebViewScreen> {
+class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserver {
   static const MethodChannel _appChannel = MethodChannel('whatsgo.nunorifa.my.id/app');
 
   InAppWebViewController? _webViewController;
@@ -39,10 +42,40 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool _isForegroundServiceEnabled = true;
   bool _hideNotificationPreview = false;
 
+  // Biometric App Lock settings
+  bool _isBiometricEnabled = false;
+  int _lockTimeoutMinutes = 0;
+  bool _isAppLocked = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadInitialConfiguration();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      BiometricService.recordAppPaused();
+    } else if (state == AppLifecycleState.resumed) {
+      _checkAppLockOnResume();
+    }
+  }
+
+  Future<void> _checkAppLockOnResume() async {
+    final shouldLock = await BiometricService.shouldLockOnResume();
+    if (shouldLock && mounted) {
+      setState(() {
+        _isAppLocked = true;
+      });
+    }
   }
 
   Future<void> _loadInitialConfiguration() async {
@@ -50,6 +83,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
     final desktop = await UserAgentService.isDesktopModeEnabled();
     final serviceEnabled = await AppForegroundService.isServiceEnabledPreference();
     final hidePreview = await AppForegroundService.isHidePreviewPreference();
+    final bioEnabled = await BiometricService.isBiometricEnabled();
+    final timeout = await BiometricService.getLockTimeoutMinutes();
 
     // Request notification & media permissions for Android
     await Permission.notification.request();
@@ -60,6 +95,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
         _isDesktopMode = desktop;
         _isForegroundServiceEnabled = serviceEnabled;
         _hideNotificationPreview = hidePreview;
+        _isBiometricEnabled = bioEnabled;
+        _lockTimeoutMinutes = timeout;
+        if (bioEnabled) {
+          _isAppLocked = true;
+        }
       });
     }
 
@@ -283,6 +323,66 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
                   const Divider(),
 
+                  // Security & Biometric Section
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Text(
+                      'Keamanan & Privasi',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppConstants.primaryTeal,
+                      ),
+                    ),
+                  ),
+
+                  // Biometric App Lock Toggle
+                  SwitchListTile(
+                    secondary: const Icon(Icons.fingerprint_rounded, color: AppConstants.primaryTeal),
+                    title: const Text('Kunci Sidik Jari / Biometrik'),
+                    subtitle: const Text('Kunci WhatsGo saat aplikasi ditutup atau di latar belakang'),
+                    value: _isBiometricEnabled,
+                    onChanged: (val) async {
+                      final authSuccess = await BiometricService.authenticate(
+                        reason: val
+                            ? 'Konfirmasi biometrik atau PIN untuk mengaktifkan kunci'
+                            : 'Konfirmasi biometrik atau PIN untuk menonaktifkan kunci',
+                      );
+                      if (authSuccess) {
+                        await BiometricService.setBiometricEnabled(val);
+                        setModalState(() {
+                          _isBiometricEnabled = val;
+                        });
+                        setState(() {
+                          _isBiometricEnabled = val;
+                        });
+                      }
+                    },
+                  ),
+
+                  // Auto-Lock Timeout Picker
+                  if (_isBiometricEnabled)
+                    ListTile(
+                      leading: const SizedBox(width: 24),
+                      title: const Text('Kunci Otomatis'),
+                      subtitle: Text(_getTimeoutLabel(_lockTimeoutMinutes)),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () async {
+                        final selected = await _showTimeoutPicker(context, _lockTimeoutMinutes);
+                        if (selected != null) {
+                          await BiometricService.setLockTimeoutMinutes(selected);
+                          setModalState(() {
+                            _lockTimeoutMinutes = selected;
+                          });
+                          setState(() {
+                            _lockTimeoutMinutes = selected;
+                          });
+                        }
+                      },
+                    ),
+
+                  const Divider(),
+
                   // User-Agent Editor
                   ListTile(
                     leading: const Icon(Icons.badge_outlined),
@@ -320,7 +420,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   ListTile(
                     leading: const Icon(Icons.info_outline),
                     title: const Text('Tentang WhatsGo'),
-                    subtitle: const Text('WA Web To Go Reborn - v1.0.0 (Milestone 4)'),
+                    subtitle: const Text('WA Web To Go Reborn - v1.0.0 (Milestone 5)'),
                     onTap: () {
                       Navigator.pop(context);
                       showAboutDialog(
@@ -340,65 +440,61 @@ class _WebViewScreenState extends State<WebViewScreen> {
     );
   }
 
-  void _showUserAgentDialog() {
-    final controller = TextEditingController(text: _currentUserAgent);
+  String _getTimeoutLabel(int minutes) {
+    switch (minutes) {
+      case 0:
+        return 'Segera';
+      case 1:
+        return 'Setelah 1 menit';
+      case 5:
+        return 'Setelah 5 menit';
+      case 15:
+        return 'Setelah 15 menit';
+      default:
+        return 'Setelah $minutes menit';
+    }
+  }
 
+  Future<int?> _showTimeoutPicker(BuildContext context, int currentMinutes) {
+    final options = [
+      {'label': 'Segera', 'value': 0},
+      {'label': 'Setelah 1 menit', 'value': 1},
+      {'label': 'Setelah 5 menit', 'value': 5},
+      {'label': 'Setelah 15 menit', 'value': 15},
+    ];
+
+    return showDialog<int>(
+      context: context,
+      builder: (ctx) {
+        return SimpleDialog(
+          title: const Text('Kunci Otomatis'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          children: options.map((opt) {
+            final isSelected = currentMinutes == opt['value'];
+            return ListTile(
+              title: Text(opt['label'] as String),
+              leading: Icon(
+                isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: isSelected ? AppConstants.primaryTeal : Colors.grey,
+              ),
+              onTap: () => Navigator.pop(ctx, opt['value'] as int),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  void _showUserAgentDialog() {
     showDialog(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Ubah String User-Agent'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Gunakan User-Agent Chrome Desktop versi terbaru jika WhatsApp memblokir akses browser.',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'User-Agent String',
-              ),
-              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await UserAgentService.resetToDefault();
-              final defaultUa = await UserAgentService.getUserAgent();
-              setState(() {
-                _currentUserAgent = defaultUa;
-              });
-              Navigator.pop(dialogCtx);
-              _reloadPage();
-            },
-            child: const Text('Reset ke Default'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newUa = controller.text.trim();
-              if (newUa.isNotEmpty) {
-                await UserAgentService.setUserAgent(newUa);
-                setState(() {
-                  _currentUserAgent = newUa;
-                });
-                Navigator.pop(dialogCtx);
-                _reloadPage();
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primaryTeal,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Simpan & Muat Ulang'),
-          ),
-        ],
+      builder: (dialogCtx) => UserAgentDialog(
+        onApplied: (newUa) {
+          setState(() {
+            _currentUserAgent = newUa;
+          });
+          _reloadPage();
+        },
       ),
     );
   }
@@ -438,6 +534,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
 
+        // 0. If app is locked, back button minimizes app to background
+        if (_isAppLocked) {
+          await _moveTaskToBack();
+          return;
+        }
+
         // 1. If currently inside an active chat in 1-column mode, close the chat and return to list
         if (!_isDesktopMode && _isInChat) {
           await _webViewController?.evaluateJavascript(
@@ -461,8 +563,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
             // Collapsible / Tap-toggleable Slim Top Bar
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              height: _showSlimBar ? 48.0 + MediaQuery.of(context).padding.top : 0.0,
-              child: _showSlimBar
+              height: (!_isAppLocked && _showSlimBar)
+                  ? 48.0 + MediaQuery.of(context).padding.top
+                  : 0.0,
+              child: (!_isAppLocked && _showSlimBar)
                   ? SlimAppBar(
                       progress: _progress,
                       isLoading: _isLoading,
@@ -700,6 +804,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         onRetry: _reloadPage,
                       ),
                     ),
+
+                  // Lock Screen Overlay (Privacy Protection)
+                  if (_isAppLocked)
+                    Positioned.fill(
+                      child: LockOverlay(
+                        onUnlock: () {
+                          setState(() {
+                            _isAppLocked = false;
+                          });
+                        },
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -707,15 +823,17 @@ class _WebViewScreenState extends State<WebViewScreen> {
         ),
 
         // WhatsApp-styled Floating Action Button for Direct Chat
-        floatingActionButton: FloatingActionButton(
-          backgroundColor: AppConstants.accentGreen,
-          foregroundColor: Colors.white,
-          elevation: 4,
-          shape: const CircleBorder(),
-          tooltip: 'Direct Chat (Kirim Pesan Tanpa Simpan Kontak)',
-          onPressed: _openDirectChat,
-          child: const Icon(Icons.chat, size: 24),
-        ),
+        floatingActionButton: _isAppLocked
+            ? null
+            : FloatingActionButton(
+                backgroundColor: AppConstants.accentGreen,
+                foregroundColor: Colors.white,
+                elevation: 4,
+                shape: const CircleBorder(),
+                tooltip: 'Direct Chat (Kirim Pesan Tanpa Simpan Kontak)',
+                onPressed: _openDirectChat,
+                child: const Icon(Icons.chat, size: 24),
+              ),
       ),
     );
   }

@@ -207,3 +207,21 @@ WhatsGo mengatasi masalah ini dengan dua lapis perlindungan:
 - **Zero Middleware Server:** Tidak ada peladen (server) perantara atau API proxy yang digunakan. Seluruh lalu lintas data bergerak langsung antara WebView perangkat dengan server resmi `*.whatsapp.com`.
 - **Enkripsi End-to-End Bawaan:** Enkripsi end-to-end asli WhatsApp Web tetap berjalan secara utuh melalui mesin Web Cryptography API di dalam WebView.
 - **Penyimpanan Lokal:** Cookie sesi dan kredensial IndexedDB disimpan di direktori aplikasi privat Android (`/data/data/whatsgo.nunorifa.my.id/app_webview`).
+
+---
+
+## 10. Keamanan Biometrik & Layar Kunci Privasi (Milestone 5)
+
+WhatsGo mengintegrasikan perlindungan biometrik level perangkat (*hardware-backed security*) untuk melindungi privasi obrolan pengguna dari akses fisik tanpa izin:
+
+### 10.1 Layanan Biometrik (`BiometricService`)
+- Memanfaatkan plugin `local_auth` dengan konfigurasi `biometricOnly: false` dan `stickyAuth: true`.
+- **Fallback Kredensial Perangkat:** Jika pemindai biometrik (sidik jari / wajah) gagal atau tidak tersedia, sistem secara mulus beralih ke autentikasi PIN, Pola, atau Sandi perangkat native yang diamankan oleh Android TEE/Keystore.
+- **Auto-Lock Timeout Manager:** Menyimpan durasi batas waktu di `SharedPreferences` (*Segera, 1 Menit, 5 Menit, atau 15 Menit*). Saat siklus hidup aplikasi beralih ke `AppLifecycleState.paused`, timestamp dicatat; saat beralih ke `resumed`, selisih waktu dihitung untuk menentukan apakah layar kunci wajib diaktifkan kembali.
+
+### 10.2 Layar Penutup Privasi (`LockOverlay`)
+- Ditampilkan di atas WebView melalui `Stack` ketika `_isAppLocked == true`.
+- Mencegah kebocoran cuplikan obrolan (*chat preview leak*) saat berpindah antar-aplikasi di panel Recent Apps / App Switcher.
+- Otomatis memicu *prompt* autentikasi saat layar tampil pertama kali menggunakan `addPostFrameCallback`.
+- Saat terkunci, tombol navigasi Back Android otomatis mengarahkan aplikasi ke latar belakang (`moveTaskToBack`), mencegah pengguna melewati lapisan autentikasi.
+

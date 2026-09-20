@@ -39,5 +39,7 @@ class AppConstants {
   static const Color cardDark = Color(0xFF202C33);
   static const Color textPrimaryLight = Color(0xFF111B21);
   static const Color textPrimaryDark = Color(0xFFE9EDEF);
+  static const Color textSecondaryLight = Color(0xFF667781);
+  static const Color textSecondaryDark = Color(0xFF8696A0);
 }
 
