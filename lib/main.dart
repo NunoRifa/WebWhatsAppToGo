@@ -61,7 +61,6 @@ class WhatsGoApp extends StatelessWidget {
           secondary: AppConstants.accentGreen,
           brightness: Brightness.dark,
           surface: AppConstants.cardDark,
-          background: AppConstants.backgroundDark,
         ),
         scaffoldBackgroundColor: AppConstants.backgroundDark,
         appBarTheme: const AppBarTheme(

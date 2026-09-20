@@ -22,7 +22,7 @@ dependencies:
   local_auth: ^2.3.0
 
   # Background Services
-  flutter_foreground_task: ^8.18.0
+  flutter_foreground_task: ^11.0.3
 
   # Utilities & Icons
   url_launcher: ^6.3.0

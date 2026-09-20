@@ -19,7 +19,7 @@ class WhatsGoTaskHandler extends TaskHandler {
   }
 
   @override
-  Future<void> onDestroy(DateTime timestamp) async {
+  Future<void> onDestroy(DateTime timestamp, bool isStopped) async {
     // Task destroyed
   }
 
@@ -31,7 +31,7 @@ class WhatsGoTaskHandler extends TaskHandler {
   }
 
   @override
-  void onNotificationNotificationPressed() {
+  void onNotificationPressed() {
     FlutterForegroundTask.launchApp();
   }
 }
@@ -44,7 +44,6 @@ class AppForegroundService {
   static void init() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
-        id: 1001,
         channelId: 'whatsgo_foreground_service',
         channelName: 'WhatsGo Layanan Siaga',
         channelDescription: 'Menjaga koneksi WhatsApp Web tetap aktif di latar belakang',
@@ -119,4 +118,3 @@ class AppForegroundService {
     return prefs.setBool(_prefKeyHidePreview, hide);
   }
 }
-

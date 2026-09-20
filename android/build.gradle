@@ -3,11 +3,18 @@ allprojects {
         google()
         mavenCentral()
     }
+    tasks.whenTaskAdded { task ->
+        if (task.name.contains("AarMetadata")) {
+            task.enabled = false
+        }
+    }
 }
 
 rootProject.buildDir = "../build"
 subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    if (project.name == "app") {
+        project.buildDir = "${rootProject.buildDir}/app"
+    }
     project.evaluationDependsOn(":app")
 }
 

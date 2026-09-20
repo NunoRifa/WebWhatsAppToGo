@@ -112,37 +112,88 @@ WebWhatsAppToGo/
 
 ---
 
-## 🛠️ Panduan Build & Instalasi
+## 🛠️ Panduan Build & Menjalankan Aplikasi (How to Run)
 
-### Prasyarat
-1. **Flutter SDK** (versi 3.19.0 atau yang lebih baru).
-2. **Java Development Kit (JDK)** versi 17 atau 21.
-3. **Android SDK** dengan platform SDK 34 (Android 14).
+### Prasyarat Environment
+1. **Flutter SDK** (Channel `stable`, versi 3.19.0 atau yang lebih baru).
+2. **Java Development Kit (JDK)** versi 17 (disarankan Eclipse Adoptium / Temurin JDK 17).
+3. **Android SDK & Toolchain**:
+   - SDK Platform: Android API 34 / 35 / 36
+   - Android SDK Build-Tools: 34.0.0
+   - Android Command-line Tools (`cmdline-tools;latest`)
+   - Android SDK Platform-Tools (`adb`)
+4. **Perangkat Target**: Smartphone Android fisik (USB Debugging aktif) atau Android Emulator (AVD x86_64, API 34+).
 
-### Langkah-Langkah
+---
 
-1. **Clone repositori ini:**
-   ```bash
-   git clone https://github.com/your-username/WebWhatsAppToGo.git
-   cd WebWhatsAppToGo
-   ```
+### Langkah-Langkah Menjalankan Aplikasi
 
-2. **Unduh dependensi Flutter:**
-   ```bash
-   flutter pub get
-   ```
+#### 1. Persiapan Dependensi
+Masuk ke direktori proyek dan unduh semua package:
+```bash
+flutter pub get
+```
 
-3. **Jalankan aplikasi di perangkat Android / Emulator:**
-   ```bash
-   flutter run
-   ```
+#### 2. Menyiapkan Perangkat / Emulator
+Pastikan perangkat terhubung atau nyalakan emulator Android:
+```bash
+# Melihat daftar emulator yang tersedia
+flutter emulators
 
-4. **Membangun APK Rilis Mandiri:**
-   ```bash
-   flutter build apk --release
-   ```
-   File APK hasil kompilasi akan berada di:
-   `build/app/outputs/flutter-apk/app-release.apk`
+# Menjalankan emulator WhatsGo (atau nama AVD Anda)
+flutter emulators --launch WhatsGo_Pixel
+```
+
+Periksa ketersediaan perangkat yang terhubung:
+```bash
+flutter devices
+```
+
+#### 3. Menjalankan Aplikasi (`flutter run`)
+Jalankan aplikasi ke perangkat/emulator menggunakan perintah:
+```bash
+flutter run --android-skip-build-dependency-validation
+```
+
+> **Catatan:** Flag `--android-skip-build-dependency-validation` digunakan untuk memastikan proses kompilasi berjalan lancar melewati validasi ketat versi Gradle pada Flutter modern.
+
+Jika memiliki lebih dari satu perangkat aktif, tentukan target ID perangkat (misalnya `emulator-5554`):
+```bash
+flutter run -d emulator-5554 --android-skip-build-dependency-validation
+```
+
+---
+
+### 📦 Membangun Berkas APK
+
+- **Build APK Debug:**
+  ```bash
+  flutter build apk --debug --android-skip-build-dependency-validation
+  ```
+  *Output:* `build/app/outputs/flutter-apk/app-debug.apk`
+
+- **Build APK Release:**
+  ```bash
+  flutter build apk --release --android-skip-build-dependency-validation
+  ```
+  *Output:* `build/app/outputs/flutter-apk/app-release.apk`
+
+---
+
+### 🔧 Pemecahan Masalah Cepat (Troubleshooting)
+
+- **Device not found / offline:**
+  Pastikan `adb` aktif dengan menjalankan `adb devices`. Jika terputus, restart daemon ADB dengan:
+  ```bash
+  adb kill-server
+  adb start-server
+  ```
+- **Error Build Cache:**
+  Bersihkan cache build lama dan ambil ulang package:
+  ```bash
+  flutter clean
+  flutter pub get
+  ```
 
 ---
 

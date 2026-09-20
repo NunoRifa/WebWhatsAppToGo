@@ -1,6 +1,6 @@
 package whatsgo.nunorifa.my.id
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.os.Bundle
@@ -17,7 +17,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
 import java.io.File
 
-class MainActivity: FlutterActivity() {
+class MainActivity: FlutterFragmentActivity() {
     private val CHANNEL = "whatsgo.nunorifa.my.id/app"
     private val MESSAGE_CHANNEL_ID = "whatsgo_messages_channel"
     private val DOWNLOAD_CHANNEL_ID = "whatsgo_downloads_channel"

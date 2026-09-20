@@ -27,7 +27,7 @@ class ErrorView extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: (isDark ? Colors.redAccent.shade700 : Colors.red.shade100)
-                    .withOpacity(0.2),
+                    .withValues(alpha: 0.2),
               ),
               child: Icon(
                 Icons.wifi_off_rounded,

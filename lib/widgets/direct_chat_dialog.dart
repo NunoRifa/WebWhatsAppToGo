@@ -142,7 +142,7 @@ class _DirectChatDialogState extends State<DirectChatDialog> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppConstants.accentGreen.withOpacity(0.15),
+                    color: AppConstants.accentGreen.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(

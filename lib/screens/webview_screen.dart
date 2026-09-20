@@ -1,5 +1,4 @@
 import 'dart:collection';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -9,7 +8,6 @@ import '../constants/app_constants.dart';
 import '../constants/download_scripts.dart';
 import '../constants/notification_scripts.dart';
 import '../constants/responsive_scripts.dart';
-import '../services/direct_chat_service.dart';
 import '../services/download_service.dart';
 import '../services/foreground_service.dart';
 import '../services/user_agent_service.dart';
@@ -112,7 +110,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
     ]);
   }
 
-  Future<void> _handlePermissionRequest(
+  Future<PermissionResponse> _handlePermissionRequest(
     InAppWebViewController controller,
     PermissionRequest request,
   ) async {
@@ -124,8 +122,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         await Permission.microphone.request();
       }
     }
-    return controller.android.grantPermissions(
-      request: request,
+    return PermissionResponse(
       resources: resources,
       action: PermissionResponseAction.GRANT,
     );
@@ -438,7 +435,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
 
         // 1. If currently inside an active chat in 1-column mode, close the chat and return to list
@@ -572,8 +569,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       );
                     },
                     onPermissionRequest: (controller, request) async {
-                      await _handlePermissionRequest(controller, request);
-                      return null;
+                      return await _handlePermissionRequest(controller, request);
                     },
                     onDownloadStartRequest: (controller, downloadStartRequest) async {
                       final url = downloadStartRequest.url.toString();
@@ -677,7 +673,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: AppConstants.primaryTeal.withOpacity(0.85),
+                            color: AppConstants.primaryTeal.withValues(alpha: 0.85),
                             shape: BoxShape.circle,
                             boxShadow: const [
                               BoxShadow(
