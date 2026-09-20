@@ -97,25 +97,37 @@ Object.defineProperty(navigator, 'maxTouchPoints', {
 
 ---
 
-## 3. Adaptasi Mobile Viewport & Injeksi DOM
+## 3. Adaptasi Mobile Viewport & Injeksi DOM (Mobile-First v2.0)
 
 WhatsApp Web desktop dirancang dengan struktur 2 kolom:
 - Kolom kiri: `#side` (daftar kontak & riwayat obrolan)
 - Kolom kanan: `#main` (isi ruang obrolan)
 
-### 3.1 CSS Injeksi (`ResponsiveScripts.mobileCss`)
-Pada layar smartphone, kedua panel dipaksa memiliki lebar 100%:
-- Saat kelas `.whatsgo-in-list` aktif: `#side` tampil selebar 100%, sedangkan `#main` disembunyikan (`display: none !important`).
-- Saat kelas `.whatsgo-in-chat` aktif: `#side` disembunyikan, sedangkan `#main` tampil selebar 100%.
+### 3.1 Viewport Meta Injection (`ResponsiveScripts.viewportInjectionScript`)
+Skrip ini disuntikkan pada `AT_DOCUMENT_START` dan merupakan perbaikan paling fundamental:
+- Menginjeksi `<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">`.
+- Tanpa tag ini, Android System WebView merender halaman seolah layar berukuran desktop ~980px, menyusutkan semua elemen.
+- Dengan tag ini, WhatsApp Web merender pada lebar perangkat sesungguhnya (~360-420dp).
 
-### 3.2 Dynamic `MutationObserver`
-Sebuah `MutationObserver` JavaScript terus memantau `document.body`.
-1. Jika elemen `#main` terdeteksi di DOM, observer mengaktifkan kelas `.whatsgo-in-chat` dan menyuntikkan tombol *Virtual Back* (`.whatsgo-back-btn`) ke dalam header obrolan.
-2. Observer memanggil channel JavaScript ke Flutter:
-   ```javascript
-   window.flutter_inappwebview.callHandler('onChatStateChanged', inChat);
-   ```
-   sehingga aplikasi Flutter mengetahui secara pasti apakah pengguna sedang berada di dalam ruang chat atau di daftar utama.
+### 3.2 CSS Mobile-First Menyeluruh (`ResponsiveScripts.mobileCss`)
+CSS injeksi mencakup 12 area utama:
+1. **Global container resets** — menghapus semua `min-width` desktop.
+2. **Chat List (`#side`)** — fullscreen, header compact, search bar proporsional.
+3. **Room Chat (`#main`)** — fullscreen, header compact, bubble max-width 85%.
+4. **1-Column switching** — `.whatsgo-in-chat` dan `.whatsgo-in-list` untuk toggle panel.
+5. **Login/QR Code** — styling responsive untuk halaman landing, QR code centered.
+6. **Panel sekunder fullscreen** — Contact Info, Group Info, Status, Channels (`position: fixed; width: 100vw; height: 100vh`).
+7. **Emoji/Sticker/GIF picker** — `width: 100vw; max-height: 50vh`.
+8. **Media viewer/lightbox** — fullscreen.
+9. **Modal dialogs** — `max-width: 90vw`.
+10. **Elemen desktop tersembunyi** — download banners, tooltips.
+11. **Touch improvements** — minimum touch target 36px, smooth scrolling.
+12. **Dark mode** — semua override menggunakan properti struktural (width, flex, position) yang theme-independent.
+
+### 3.3 Throttled `MutationObserver` dengan Deteksi Akurat
+- Observer menggunakan `requestAnimationFrame` untuk membatasi `updateChatState()` maks 1× per frame (~60fps).
+- Deteksi chat state menggunakan selector lebih akurat: `#main` + keberadaan `[data-testid="conversation-panel-body"]` atau `[data-testid="conversation-compose-box-input"]`, mencegah false positive dari splash/intro screen.
+- Navigasi kembali ditangani sepenuhnya oleh tombol Back Android via `PopScope`, tanpa injeksi tombol virtual.
 
 ---
 

@@ -15,7 +15,6 @@ import '../services/user_agent_service.dart';
 import '../widgets/direct_chat_dialog.dart';
 import '../widgets/error_view.dart';
 import '../widgets/lock_overlay.dart';
-import '../widgets/slim_app_bar.dart';
 import '../widgets/user_agent_dialog.dart';
 
 class WebViewScreen extends StatefulWidget {
@@ -30,12 +29,10 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
 
   InAppWebViewController? _webViewController;
   String _currentUserAgent = AppConstants.defaultDesktopUserAgent;
-  bool _isDesktopMode = false;
   double _progress = 0.0;
   bool _isLoading = true;
   bool _hasError = false;
   String _errorMessage = '';
-  bool _showSlimBar = true;
   bool _isInChat = false;
 
   // Foreground Service & Notification settings
@@ -80,7 +77,6 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
 
   Future<void> _loadInitialConfiguration() async {
     final ua = await UserAgentService.getUserAgent();
-    final desktop = await UserAgentService.isDesktopModeEnabled();
     final serviceEnabled = await AppForegroundService.isServiceEnabledPreference();
     final hidePreview = await AppForegroundService.isHidePreviewPreference();
     final bioEnabled = await BiometricService.isBiometricEnabled();
@@ -99,7 +95,6 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
     if (mounted) {
       setState(() {
         _currentUserAgent = ua;
-        _isDesktopMode = desktop;
         _isForegroundServiceEnabled = serviceEnabled;
         _hideNotificationPreview = hidePreview;
         _isBiometricEnabled = effectiveBio;
@@ -143,6 +138,10 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
   UnmodifiableListView<UserScript> _buildInitialUserScripts() {
     return UnmodifiableListView([
       UserScript(
+        source: ResponsiveScripts.viewportInjectionScript,
+        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+      ),
+      UserScript(
         source: AppConstants.platformSpoofScript,
         injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
       ),
@@ -175,16 +174,16 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
     );
   }
 
-  /// Inject or remove responsive CSS/JS based on current desktop toggle
+  /// Inject responsive CSS/JS for mobile-first layout
   Future<void> _applyResponsiveMode() async {
     if (_webViewController == null) return;
 
-    if (!_isDesktopMode) {
-      await _webViewController!.injectCSSCode(source: ResponsiveScripts.mobileCss);
-      await _webViewController!.evaluateJavascript(source: ResponsiveScripts.mobileJs);
-    } else {
-      await _webViewController!.evaluateJavascript(source: ResponsiveScripts.disableMobileScript);
-    }
+    // Re-inject viewport meta in case page navigation cleared it
+    await _webViewController!.evaluateJavascript(
+      source: ResponsiveScripts.viewportInjectionScript,
+    );
+    await _webViewController!.injectCSSCode(source: ResponsiveScripts.mobileCss);
+    await _webViewController!.evaluateJavascript(source: ResponsiveScripts.mobileJs);
   }
 
   void _reloadPage() {
@@ -198,15 +197,6 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
     _webViewController?.reload();
   }
 
-  void _toggleDesktopMode() async {
-    final newMode = !_isDesktopMode;
-    await UserAgentService.setDesktopModeEnabled(newMode);
-    setState(() {
-      _isDesktopMode = newMode;
-      _isInChat = false;
-    });
-    _applyResponsiveMode();
-  }
 
   /// Move app to background without destroying process or WebSocket connection
   Future<void> _moveTaskToBack() async {
@@ -278,14 +268,14 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                     },
                   ),
 
-                  // Toggle Desktop View
-                  SwitchListTile(
-                    title: const Text('Mode Desktop Penuh'),
-                    subtitle: const Text('Tampilkan 2-kolom bawaan WhatsApp Web'),
-                    value: _isDesktopMode,
-                    onChanged: (val) {
+                  // Reload Page
+                  ListTile(
+                    leading: const Icon(Icons.refresh, color: AppConstants.primaryTeal),
+                    title: const Text('Muat Ulang Halaman'),
+                    subtitle: const Text('Reload WhatsApp Web jika terjadi masalah'),
+                    onTap: () {
                       Navigator.pop(context);
-                      _toggleDesktopMode();
+                      _reloadPage();
                     },
                   ),
 
@@ -485,7 +475,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                   ListTile(
                     leading: const Icon(Icons.info_outline),
                     title: const Text('Tentang WhatsGo'),
-                    subtitle: const Text('WA Web To Go Reborn - v1.0.0 (Milestone 5)'),
+                    subtitle: const Text('WA Web To Go Reborn - v1.0.0 (Milestone 6)'),
                     onTap: () {
                       Navigator.pop(context);
                       showAboutDialog(
@@ -606,7 +596,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
         }
 
         // 1. If currently inside an active chat in 1-column mode, close the chat and return to list
-        if (!_isDesktopMode && _isInChat) {
+        if (_isInChat) {
           await _webViewController?.evaluateJavascript(
             source: 'window.whatsGoCloseChat && window.whatsGoCloseChat();',
           );
@@ -623,281 +613,230 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
         await _moveTaskToBack();
       },
       child: Scaffold(
-        body: Column(
+        body: Stack(
           children: [
-            // Collapsible / Tap-toggleable Slim Top Bar
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              height: (!_isAppLocked && _showSlimBar)
-                  ? 48.0 + MediaQuery.of(context).padding.top
-                  : 0.0,
-              child: (!_isAppLocked && _showSlimBar)
-                  ? SlimAppBar(
-                      progress: _progress,
-                      isLoading: _isLoading,
-                      isDesktopMode: _isDesktopMode,
-                      onReload: _reloadPage,
-                      onToggleDesktopMode: _toggleDesktopMode,
-                      onOpenSettings: _showSettingsModal,
-                    )
-                  : const SizedBox.shrink(),
-            ),
-
-            // Main Content Area: InAppWebView or ErrorView
-            Expanded(
-              child: Stack(
-                children: [
-                  InAppWebView(
-                    initialUrlRequest: URLRequest(
-                      url: WebUri(AppConstants.whatsAppWebUrl),
-                    ),
-                    initialSettings: _buildWebViewSettings(),
-                    initialUserScripts: _buildInitialUserScripts(),
-                    onWebViewCreated: (controller) {
-                      _webViewController = controller;
-
-                      // Register JavaScript Handler for chat state updates
-                      controller.addJavaScriptHandler(
-                        handlerName: 'onChatStateChanged',
-                        callback: (args) {
-                          if (args.isNotEmpty && args[0] is bool) {
-                            setState(() {
-                              _isInChat = args[0] as bool;
-                            });
-                          }
-                        },
-                      );
-
-                      // Register JavaScript Handler for incoming web notifications
-                      controller.addJavaScriptHandler(
-                        handlerName: 'onIncomingWebNotification',
-                        callback: (args) async {
-                          if (args.isNotEmpty && args[0] is Map) {
-                            final data = Map<String, dynamic>.from(args[0] as Map);
-                            final title = (data['title'] ?? 'WhatsApp').toString();
-                            final body = (data['body'] ?? '').toString();
-
-                            // Dispatch native Android notification with privacy check
-                            try {
-                              await _appChannel.invokeMethod('showIncomingNotification', {
-                                'title': title,
-                                'body': body,
-                                'hidePreview': _hideNotificationPreview,
-                              });
-                            } catch (e) {
-                              debugPrint('WhatsGo: Error displaying native notification: $e');
-                            }
-                          }
-                        },
-                      );
-
-                      // Register JavaScript Handler for Blob file downloads
-                      controller.addJavaScriptHandler(
-                        handlerName: 'onBlobDownloadRequest',
-                        callback: (args) async {
-                          if (args.isNotEmpty && args[0] is Map) {
-                            final data = Map<String, dynamic>.from(args[0] as Map);
-                            final filename = (data['filename'] ?? 'whatsgo_media').toString();
-                            final mimeType = (data['mimeType'] ?? 'application/octet-stream').toString();
-                            final base64Data = (data['base64Data'] ?? '').toString();
-
-                            if (base64Data.isNotEmpty) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Mengunduh: $filename...'),
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                              }
-
-                              final file = await DownloadService.saveBase64Data(
-                                filename: filename,
-                                base64Data: base64Data,
-                                mimeType: mimeType,
-                              );
-
-                              if (file != null && mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Tersimpan di Download/WhatsGo: $filename'),
-                                    backgroundColor: AppConstants.primaryTeal,
-                                    action: SnackBarAction(
-                                      label: 'Buka',
-                                      textColor: AppConstants.accentGreen,
-                                      onPressed: () {
-                                        DownloadService.openFileDirectly(file.path, mimeType);
-                                      },
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                          }
-                        },
-                      );
-                    },
-                    onPermissionRequest: (controller, request) async {
-                      return await _handlePermissionRequest(controller, request);
-                    },
-                    onDownloadStartRequest: (controller, downloadStartRequest) async {
-                      final url = downloadStartRequest.url.toString();
-                      final suggestedFilename = downloadStartRequest.suggestedFilename ?? 'whatsgo_file';
-                      final mimeType = downloadStartRequest.mimeType ?? 'application/octet-stream';
-
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Mengunduh $suggestedFilename...'),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      }
-
-                      final file = await DownloadService.downloadHttpUrl(
-                        url: url,
-                        suggestedFilename: suggestedFilename,
-                        mimeType: mimeType,
-                      );
-
-                      if (file != null && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Tersimpan di Download/WhatsGo: $suggestedFilename'),
-                            backgroundColor: AppConstants.primaryTeal,
-                            action: SnackBarAction(
-                              label: 'Buka',
-                              textColor: AppConstants.accentGreen,
-                              onPressed: () {
-                                DownloadService.openFileDirectly(file.path, mimeType);
-                              },
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    onLoadStart: (controller, url) {
-                      setState(() {
-                        _isLoading = true;
-                        _hasError = false;
-                        _progress = 0.1;
-                      });
-                    },
-                    onProgressChanged: (controller, progress) {
-                      setState(() {
-                        _progress = progress / 100;
-                        if (progress >= 100) {
-                          _isLoading = false;
-                        }
-                      });
-                    },
-                    onLoadStop: (controller, url) async {
-                      setState(() {
-                        _isLoading = false;
-                        _progress = 1.0;
-                      });
-                      // Apply responsive single-column layout
-                      await _applyResponsiveMode();
-                      // Ensure notification and download scripts are active
-                      await controller.evaluateJavascript(
-                        source: NotificationScripts.notificationInterceptionScript,
-                      );
-                      await controller.evaluateJavascript(
-                        source: DownloadScripts.blobInterceptorScript,
-                      );
-                    },
-                    onReceivedError: (controller, request, error) {
-                      if (request.isForMainFrame ?? false) {
-                        setState(() {
-                          _isLoading = false;
-                          _hasError = true;
-                          _errorMessage = error.description;
-                        });
-                      }
-                    },
-                    onScrollChanged: (controller, x, y) {
-                      if (y > 50 && _showSlimBar) {
-                        setState(() {
-                          _showSlimBar = false;
-                        });
-                      } else if (y <= 10 && !_showSlimBar) {
-                        setState(() {
-                          _showSlimBar = true;
-                        });
-                      }
-                    },
-                  ),
-
-                  // Floating small trigger to unhide toolbar when collapsed
-                  if (!_showSlimBar)
-                    Positioned(
-                      top: MediaQuery.of(context).padding.top + 4,
-                      right: 12,
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _showSlimBar = true;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppConstants.primaryTeal.withValues(alpha: 0.85),
-                            shape: BoxShape.circle,
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              )
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.keyboard_arrow_down,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  // Error Overlay
-                  if (_hasError)
-                    Positioned.fill(
-                      child: ErrorView(
-                        errorMessage: _errorMessage,
-                        onRetry: _reloadPage,
-                      ),
-                    ),
-
-                  // Lock Screen Overlay (Privacy Protection)
-                  if (_isAppLocked)
-                    Positioned.fill(
-                      child: LockOverlay(
-                        onUnlock: () {
-                          setState(() {
-                            _isAppLocked = false;
-                          });
-                        },
-                      ),
-                    ),
-                ],
+            InAppWebView(
+              initialUrlRequest: URLRequest(
+                url: WebUri(AppConstants.whatsAppWebUrl),
               ),
+              initialSettings: _buildWebViewSettings(),
+              initialUserScripts: _buildInitialUserScripts(),
+              onWebViewCreated: (controller) {
+                _webViewController = controller;
+
+                // Register JavaScript Handler for chat state updates
+                controller.addJavaScriptHandler(
+                  handlerName: 'onChatStateChanged',
+                  callback: (args) {
+                    if (args.isNotEmpty && args[0] is bool) {
+                      setState(() {
+                        _isInChat = args[0] as bool;
+                      });
+                    }
+                  },
+                );
+
+                // Register JavaScript Handler for incoming web notifications
+                controller.addJavaScriptHandler(
+                  handlerName: 'onIncomingWebNotification',
+                  callback: (args) async {
+                    if (args.isNotEmpty && args[0] is Map) {
+                      final data = Map<String, dynamic>.from(args[0] as Map);
+                      final title = (data['title'] ?? 'WhatsApp').toString();
+                      final body = (data['body'] ?? '').toString();
+
+                      // Dispatch native Android notification with privacy check
+                      try {
+                        await _appChannel.invokeMethod('showIncomingNotification', {
+                          'title': title,
+                          'body': body,
+                          'hidePreview': _hideNotificationPreview,
+                        });
+                      } catch (e) {
+                        debugPrint('WhatsGo: Error displaying native notification: \$e');
+                      }
+                    }
+                  },
+                );
+
+                // Register JavaScript Handler for Blob file downloads
+                controller.addJavaScriptHandler(
+                  handlerName: 'onBlobDownloadRequest',
+                  callback: (args) async {
+                    if (args.isNotEmpty && args[0] is Map) {
+                      final data = Map<String, dynamic>.from(args[0] as Map);
+                      final filename = (data['filename'] ?? 'whatsgo_media').toString();
+                      final mimeType = (data['mimeType'] ?? 'application/octet-stream').toString();
+                      final base64Data = (data['base64Data'] ?? '').toString();
+
+                      if (base64Data.isNotEmpty) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Mengunduh: \$filename...'),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+
+                        final file = await DownloadService.saveBase64Data(
+                          filename: filename,
+                          base64Data: base64Data,
+                          mimeType: mimeType,
+                        );
+
+                        if (file != null && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Tersimpan di Download/WhatsGo: \$filename'),
+                              backgroundColor: AppConstants.primaryTeal,
+                              action: SnackBarAction(
+                                label: 'Buka',
+                                textColor: AppConstants.accentGreen,
+                                onPressed: () {
+                                  DownloadService.openFileDirectly(file.path, mimeType);
+                                },
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  },
+                );
+              },
+              onPermissionRequest: (controller, request) async {
+                return await _handlePermissionRequest(controller, request);
+              },
+              onDownloadStartRequest: (controller, downloadStartRequest) async {
+                final url = downloadStartRequest.url.toString();
+                final suggestedFilename = downloadStartRequest.suggestedFilename ?? 'whatsgo_file';
+                final mimeType = downloadStartRequest.mimeType ?? 'application/octet-stream';
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Mengunduh \$suggestedFilename...'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+
+                final file = await DownloadService.downloadHttpUrl(
+                  url: url,
+                  suggestedFilename: suggestedFilename,
+                  mimeType: mimeType,
+                );
+
+                if (file != null && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Tersimpan di Download/WhatsGo: \$suggestedFilename'),
+                      backgroundColor: AppConstants.primaryTeal,
+                      action: SnackBarAction(
+                        label: 'Buka',
+                        textColor: AppConstants.accentGreen,
+                        onPressed: () {
+                          DownloadService.openFileDirectly(file.path, mimeType);
+                        },
+                      ),
+                    ),
+                  );
+                }
+              },
+              onLoadStart: (controller, url) {
+                setState(() {
+                  _isLoading = true;
+                  _hasError = false;
+                  _progress = 0.1;
+                });
+              },
+              onProgressChanged: (controller, progress) {
+                setState(() {
+                  _progress = progress / 100;
+                  if (progress >= 100) {
+                    _isLoading = false;
+                  }
+                });
+              },
+              onLoadStop: (controller, url) async {
+                setState(() {
+                  _isLoading = false;
+                  _progress = 1.0;
+                });
+                // Apply responsive single-column layout
+                await _applyResponsiveMode();
+                // Ensure notification and download scripts are active
+                await controller.evaluateJavascript(
+                  source: NotificationScripts.notificationInterceptionScript,
+                );
+                await controller.evaluateJavascript(
+                  source: DownloadScripts.blobInterceptorScript,
+                );
+              },
+              onReceivedError: (controller, request, error) {
+                if (request.isForMainFrame ?? false) {
+                  setState(() {
+                    _isLoading = false;
+                    _hasError = true;
+                    _errorMessage = error.description;
+                  });
+                }
+              },
             ),
+
+            // Loading progress indicator (top of screen)
+            if (_isLoading && _progress < 1.0)
+              Positioned(
+                top: MediaQuery.of(context).padding.top,
+                left: 0,
+                right: 0,
+                child: LinearProgressIndicator(
+                  value: _progress,
+                  minHeight: 2.5,
+                  backgroundColor: Colors.transparent,
+                  valueColor: const AlwaysStoppedAnimation<Color>(AppConstants.accentGreen),
+                ),
+              ),
+
+            // Error Overlay
+            if (_hasError)
+              Positioned.fill(
+                child: ErrorView(
+                  errorMessage: _errorMessage,
+                  onRetry: _reloadPage,
+                ),
+              ),
+
+            // Lock Screen Overlay (Privacy Protection)
+            if (_isAppLocked)
+              Positioned.fill(
+                child: LockOverlay(
+                  onUnlock: () {
+                    setState(() {
+                      _isAppLocked = false;
+                    });
+                  },
+                ),
+              ),
           ],
         ),
 
-        // WhatsApp-styled Floating Action Button for Direct Chat
-        floatingActionButton: _isAppLocked
+        // WhatsApp-styled FAB: tap = Direct Chat, long-press = Settings
+        // Hidden when app is locked or user is inside a room chat
+        floatingActionButton: (_isAppLocked || _isInChat)
             ? null
-            : FloatingActionButton(
-                backgroundColor: AppConstants.accentGreen,
-                foregroundColor: Colors.white,
-                elevation: 4,
-                shape: const CircleBorder(),
-                tooltip: 'Direct Chat (Kirim Pesan Tanpa Simpan Kontak)',
-                onPressed: _openDirectChat,
-                child: const Icon(Icons.chat, size: 24),
+            : GestureDetector(
+                onLongPress: _showSettingsModal,
+                child: FloatingActionButton(
+                  backgroundColor: AppConstants.accentGreen,
+                  foregroundColor: Colors.white,
+                  elevation: 4,
+                  shape: const CircleBorder(),
+                  tooltip: 'Tap: Direct Chat | Tahan: Pengaturan',
+                  onPressed: _openDirectChat,
+                  child: const Icon(Icons.chat, size: 24),
+                ),
               ),
       ),
     );

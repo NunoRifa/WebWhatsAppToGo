@@ -13,11 +13,14 @@ WhatsGo dirancang agar **tahan masa depan (anti-obsolescence)**, responsif selay
 
 ## 🚀 Fitur Unggulan
 
-### 1. 📱 Tampilan Responsif 1-Kolom (Mobile-First)
-- Mengubah layout desktop 2-kolom WhatsApp Web menjadi 1-kolom yang pas dan nyaman dioperasikan dengan satu tangan.
-- Menggunakan **`MutationObserver` cerdas**: saat obrolan dibuka, daftar chat disembunyikan dan ruang chat diperluas 100% selebar layar ponsel.
-- Menyuntikkan tombol virtual **"Kembali"** di header obrolan.
-- **Toggle Desktop View:** Tombol cepat di toolbar untuk beralih kembali ke tampilan desktop 2-kolom jika dibutuhkan.
+### 1. 📱 Tampilan Responsif Mobile-First Immersive
+- **Viewport Meta Injection:** Memaksa WhatsApp Web merender pada lebar perangkat sesungguhnya (~360-420dp), bukan lebar desktop (~980px).
+- **CSS Override Menyeluruh:** Mengubah layout desktop 2-kolom WhatsApp Web menjadi 1-kolom fullscreen yang pas dan nyaman dioperasikan dengan satu tangan pada seluruh halaman: Login/QR Code, List Chat, Room Chat, dan panel sekunder.
+- **`MutationObserver` Cerdas & Ter-throttle:** Memantau DOM secara efisien (maks 1× per frame via `requestAnimationFrame`) untuk mendeteksi perpindahan antara daftar chat dan ruang obrolan.
+- **Deteksi State Akurat:** Membedakan antara halaman splash/intro WhatsApp Web dan percakapan aktif agar tidak terjadi false positive.
+- **Immersive Fullscreen:** Tanpa toolbar tambahan di atas layar — semua pengaturan diakses via **long-press pada FAB** hijau.
+- **FAB Kontekstual:** Tombol mengambang Direct Chat hanya tampil di List Chat, tersembunyi saat di dalam Room Chat agar tidak mengganggu area input pesan.
+- **Panel Sekunder Fullscreen:** Contact Info, Status, Channels, Emoji Picker, dan Media Viewer otomatis tampil fullscreen di layar kecil.
 
 ### 2. 🛡️ Anti-Obsolescence (Dynamic User-Agent)
 - Menggunakan identitas browser Chrome Desktop Windows 64-bit modern secara default untuk mencegah pesan *"Browser tidak didukung"*.
@@ -104,7 +107,7 @@ WebWhatsAppToGo/
 │   │   ├── app_constants.dart           # URL, Colors, Default Desktop UA
 │   │   ├── download_scripts.dart        # Blob Download Interception JS
 │   │   ├── notification_scripts.dart    # Web Notification Interception JS
-│   │   └── responsive_scripts.dart      # Injeksi CSS/JS 1-Kolom & Observer
+│   │   └── responsive_scripts.dart      # Viewport Injection, CSS Mobile-First & Observer JS
 │   ├── screens/
 │   │   └── webview_screen.dart          # Layar Utama InAppWebView & PopScope
 │   ├── services/
@@ -117,7 +120,6 @@ WebWhatsAppToGo/
 │   │   ├── direct_chat_dialog.dart      # Dialog modal Direct Chat
 │   │   ├── error_view.dart              # Layar offline / koneksi error
 │   │   ├── lock_overlay.dart            # Layar penutup privasi gembok biometrik
-│   │   ├── slim_app_bar.dart            # Auto-hide Slim Toolbar
 │   │   └── user_agent_dialog.dart       # Dialog editor User-Agent dinamis
 │   └── main.dart                        # Entrypoint & Material 3 Theming
 ├── AGENTS.md                            # Pointer Aturan Agen Proyek
