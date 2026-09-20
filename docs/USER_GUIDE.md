@@ -83,3 +83,4 @@ Jika suatu saat WhatsApp menampilkan pesan seperti *"WhatsApp requires Google Ch
 ### Q: Tombol Back langsung keluar dari aplikasi saat di dalam obrolan
 - Pastikan mode mobile 1-kolom sedang aktif (bukan mode desktop penuh).
 - Jika baru saja memuat halaman, tunggu hingga progress bar selesai (100%) agar skrip responsif terinjeksi sempurna.
+

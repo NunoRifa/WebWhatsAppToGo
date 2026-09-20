@@ -138,3 +138,4 @@ WebWhatsAppToGo/
 ## ⚖️ Penafian (Disclaimer)
 
 Aplikasi ini adalah klien web pihak ketiga independen yang memuat antarmuka resmi WhatsApp Web. Aplikasi ini **tidak berafiliasi, disponsori, atau didukung secara resmi oleh WhatsApp LLC atau Meta Platforms, Inc.** WhatsApp adalah merek dagang terdaftar milik Meta Platforms, Inc.
+

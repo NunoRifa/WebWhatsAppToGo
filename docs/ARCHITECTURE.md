@@ -146,3 +146,4 @@ WhatsGo mengatasi masalah ini dengan dua lapis perlindungan:
 - **Zero Middleware Server:** Tidak ada peladen (server) perantara atau API proxy yang digunakan. Seluruh lalu lintas data bergerak langsung antara WebView perangkat dengan server resmi `*.whatsapp.com`.
 - **Enkripsi End-to-End Bawaan:** Enkripsi end-to-end asli WhatsApp Web tetap berjalan secara utuh melalui mesin Web Cryptography API di dalam WebView.
 - **Penyimpanan Lokal:** Cookie sesi dan kredensial IndexedDB disimpan di direktori aplikasi privat Android (`/data/data/whatsgo.nunorifa.my.id/app_webview`).
+
